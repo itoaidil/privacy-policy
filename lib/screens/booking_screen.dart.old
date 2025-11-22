@@ -1,0 +1,442 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import '../models/po_model.dart';
+import '../models/booking_model.dart';
+import '../providers/travel_provider.dart';
+
+class BookingScreen extends StatefulWidget {
+  final POModel po;
+
+  const BookingScreen({super.key, required this.po});
+
+  @override
+  State<BookingScreen> createState() => _BookingScreenState();
+}
+
+class _BookingScreenState extends State<BookingScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _namaController = TextEditingController();
+  final _teleponController = TextEditingController();
+  int _jumlahPenumpang = 1;
+  DateTime _tanggalKeberangkatan = DateTime.now();
+
+  @override
+  void dispose() {
+    _namaController.dispose();
+    _teleponController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _tanggalKeberangkatan,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 90)),
+    );
+    if (picked != null && picked != _tanggalKeberangkatan) {
+      setState(() {
+        _tanggalKeberangkatan = picked;
+      });
+    }
+  }
+
+  Future<void> _submitBooking() async {
+    if (_formKey.currentState!.validate()) {
+      if (_jumlahPenumpang > widget.po.kapasitas) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Jumlah penumpang melebihi kapasitas (max: ${widget.po.kapasitas})',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final booking = BookingModel(
+        poId: widget.po.id,
+        namaPenumpang: _namaController.text,
+        nomorTelepon: _teleponController.text,
+        jumlahPenumpang: _jumlahPenumpang,
+        tanggalKeberangkatan: DateFormat(
+          'yyyy-MM-dd',
+        ).format(_tanggalKeberangkatan),
+        totalHarga: widget.po.harga * _jumlahPenumpang,
+      );
+
+      final provider = context.read<TravelProvider>();
+      final result = await provider.createBooking(booking);
+
+      if (!mounted) return;
+
+      if (result != null) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 32),
+                SizedBox(width: 12),
+                Text('Booking Berhasil!'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Booking ID: ${result.id}'),
+                const SizedBox(height: 8),
+                Text('PO: ${widget.po.nama}'),
+                Text('Penumpang: ${result.namaPenumpang}'),
+                Text('Jumlah: ${result.jumlahPenumpang} orang'),
+                Text(
+                  'Total: ${NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(result.totalHarga)}',
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Silakan hubungi PO untuk konfirmasi lebih lanjut.',
+                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pop();
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(provider.errorMessage ?? 'Gagal membuat booking'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<TravelProvider>();
+    final currencyFormat = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+    final totalHarga = widget.po.harga * _jumlahPenumpang;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Form Booking'), elevation: 0),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              color: Theme.of(context).primaryColor,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Text(
+                    widget.po.nama,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${widget.po.tempatBerangkat} → ${widget.po.tujuan}',
+                    style: const TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.po.jenisKendaraan,
+                    style: const TextStyle(color: Colors.white60, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: _namaController,
+                      decoration: InputDecoration(
+                        labelText: 'Nama Lengkap',
+                        prefixIcon: const Icon(Icons.person),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Nama tidak boleh kosong';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _teleponController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Nomor Telepon',
+                        prefixIcon: const Icon(Icons.phone),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Nomor telepon tidak boleh kosong';
+                        }
+                        if (value.length < 10) {
+                          return 'Nomor telepon tidak valid';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Jumlah Penumpang',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                IconButton(
+                                  onPressed: () {
+                                    if (_jumlahPenumpang > 1) {
+                                      setState(() {
+                                        _jumlahPenumpang--;
+                                      });
+                                    }
+                                  },
+                                  icon: const Icon(Icons.remove_circle),
+                                  iconSize: 36,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '$_jumlahPenumpang',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () {
+                                    if (_jumlahPenumpang <
+                                        widget.po.kapasitas) {
+                                      setState(() {
+                                        _jumlahPenumpang++;
+                                      });
+                                    }
+                                  },
+                                  icon: const Icon(Icons.add_circle),
+                                  iconSize: 36,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Center(
+                              child: Text(
+                                'Kapasitas tersedia: ${widget.po.kapasitas} kursi',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: InkWell(
+                        onTap: () => _selectDate(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today, size: 24),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Tanggal Keberangkatan',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      DateFormat(
+                                        'EEEE, dd MMMM yyyy',
+                                        'id_ID',
+                                      ).format(_tanggalKeberangkatan),
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios, size: 16),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Card(
+                      elevation: 3,
+                      color: Colors.blue[50],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Harga per orang:'),
+                                Text(
+                                  currencyFormat.format(widget.po.harga),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Jumlah penumpang: $_jumlahPenumpang'),
+                                Text(
+                                  currencyFormat.format(totalHarga),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 24),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Total Harga:',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  currencyFormat.format(totalHarga),
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).primaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: provider.isLoading ? null : _submitBooking,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 3,
+                      ),
+                      child: provider.isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Konfirmasi Booking',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
