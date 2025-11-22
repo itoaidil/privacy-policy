@@ -1,10 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../providers/travel_provider.dart';
 import '../models/po_model.dart';
 import 'po_detail_screen.dart';
 import 'map_picker_screen.dart';
+
+// Model untuk Location dari API
+class Location {
+  final int id;
+  final String name;
+  final String type;
+  final String? parentName;
+  final bool isPopular;
+  final String displayName;
+
+  Location({
+    required this.id,
+    required this.name,
+    required this.type,
+    this.parentName,
+    required this.isPopular,
+    required this.displayName,
+  });
+
+  factory Location.fromJson(Map<String, dynamic> json) {
+    return Location(
+      id: json['id'],
+      name: json['name'],
+      type: json['type'],
+      parentName: json['parent_name'],
+      isPopular: json['is_popular'] == 1,
+      displayName: json['display_name'],
+    );
+  }
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,6 +59,50 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _dropoffAddress;
   Map<String, double>? _pickupCoord; // {lat, lng}
   Map<String, double>? _dropoffCoord;
+
+  // Fetch locations dari API
+  Future<List<Location>> fetchLocations(String query) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://travel-api-production-23ae.up.railway.app/api/locations?search=$query&limit=30'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final locations = (data['data'] as List)
+            .map((item) => Location.fromJson(item))
+            .toList();
+        return locations;
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching locations: $e');
+      return [];
+    }
+  }
+
+  // Fetch popular locations untuk default suggestions
+  Future<List<Location>> fetchPopularLocations() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://travel-api-production-23ae.up.railway.app/api/locations/popular'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final locations = (data['data'] as List)
+            .map((item) => Location.fromJson(item))
+            .toList();
+        return locations;
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching popular locations: $e');
+      return [];
+    }
+  }
 
   @override
   void initState() {
@@ -249,67 +326,119 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                 ),
-                              TypeAheadField<String>(
+                              TypeAheadField<Location>(
                                 controller: _departureController,
                                 builder: (context, controller, focusNode) {
                                   return TextFormField(
                                     controller: controller,
                                     focusNode: focusNode,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                     decoration: InputDecoration(
                                       labelText: 'Tempat Berangkat',
-                                      prefixIcon: const Icon(Icons.location_on),
-                                      suffixIcon: IconButton(
-                                        icon: const Icon(
-                                          Icons.swap_vert,
+                                      labelStyle: GoogleFonts.poppins(),
+                                      prefixIcon: Container(
+                                        padding: const EdgeInsets.all(12),
+                                        child: const Icon(
+                                          Icons.location_on,
                                           color: Color(0xFF0D47A1),
                                         ),
-                                        onPressed: () {
-                                          if (_tempatBerangkat != null &&
-                                              _tujuan != null) {
-                                            setState(() {
-                                              // Swap values directly
-                                              final temp = _tempatBerangkat;
-                                              _tempatBerangkat = _tujuan;
-                                              _tujuan = temp;
-
-                                              // Swap text
-                                              final tempText =
-                                                  _departureController.text;
-                                              _departureController.text =
-                                                  _destinationController.text;
-                                              _destinationController.text =
-                                                  tempText;
-                                            });
-
-                                            // Reload destinations
-                                            provider.loadDestinationCities(
-                                                _tempatBerangkat!);
-
-                                            // Close any open keyboards/suggestion overlays
-                                            FocusScope.of(context).unfocus();
-
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content:
-                                                    Text('Lokasi ditukar!'),
-                                                duration:
-                                                    Duration(milliseconds: 600),
-                                                backgroundColor:
-                                                    Color(0xFF0D47A1),
-                                              ),
-                                            );
-                                          }
-                                        },
-                                        tooltip: 'Tukar lokasi',
                                       ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                      suffixIcon: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.search,
+                                            color: Colors.grey[400],
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.swap_vert,
+                                              color: Color(0xFF0D47A1),
+                                            ),
+                                            onPressed: () {
+                                              if (_tempatBerangkat != null &&
+                                                  _tujuan != null) {
+                                                setState(() {
+                                                  // Swap values directly
+                                                  final temp = _tempatBerangkat;
+                                                  _tempatBerangkat = _tujuan;
+                                                  _tujuan = temp;
+
+                                                  // Swap text
+                                                  final tempText =
+                                                      _departureController.text;
+                                                  _departureController.text =
+                                                      _destinationController
+                                                          .text;
+                                                  _destinationController.text =
+                                                      tempText;
+                                                });
+
+                                                // Reload destinations
+                                                provider.loadDestinationCities(
+                                                    _tempatBerangkat!);
+
+                                                // Close any open keyboards/suggestion overlays
+                                                FocusScope.of(context)
+                                                    .unfocus();
+
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                    content:
+                                                        Text('Lokasi ditukar!'),
+                                                    duration: Duration(
+                                                        milliseconds: 600),
+                                                    backgroundColor:
+                                                        Color(0xFF0D47A1),
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                            tooltip: 'Tukar lokasi',
+                                          ),
+                                        ],
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey[300]!,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF0D47A1),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      errorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Colors.red,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      focusedErrorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Colors.red,
+                                          width: 2,
+                                        ),
                                       ),
                                       filled: true,
-                                      fillColor: Colors.grey[50],
+                                      fillColor: Colors.white,
                                       hintText:
                                           'Ketik atau pilih tempat berangkat',
+                                      hintStyle: GoogleFonts.poppins(
+                                        color: Colors.grey[400],
+                                      ),
                                     ),
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
@@ -323,53 +452,163 @@ class _HomeScreenState extends State<HomeScreen> {
                                     },
                                   );
                                 },
-                                suggestionsCallback: (pattern) {
+                                suggestionsCallback: (pattern) async {
                                   if (pattern.isEmpty) {
-                                    return provider.departureCities;
+                                    // Show popular locations when empty
+                                    return await fetchPopularLocations();
                                   }
-                                  return provider.departureCities
-                                      .where((city) => city
-                                          .toLowerCase()
-                                          .contains(pattern.toLowerCase()))
-                                      .toList();
+                                  // Search locations by pattern
+                                  return await fetchLocations(pattern);
                                 },
-                                emptyBuilder: (context) =>
-                                    const SizedBox.shrink(),
-                                itemBuilder: (context, city) {
-                                  return ListTile(
-                                    leading: const Icon(Icons.location_city),
-                                    title: Text(city),
+                                emptyBuilder: (context) => Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Text(
+                                    'Tidak ada lokasi ditemukan',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                                itemBuilder: (context, location) {
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: Colors.grey[200]!,
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                    child: ListTile(
+                                      leading: CircleAvatar(
+                                        radius: 20,
+                                        backgroundColor: location.isPopular
+                                            ? const Color(0xFFFF6F00)
+                                                .withOpacity(0.1)
+                                            : const Color(0xFF0D47A1)
+                                                .withOpacity(0.1),
+                                        child: Icon(
+                                          location.type == 'city'
+                                              ? Icons.location_city
+                                              : Icons.location_on,
+                                          color: location.isPopular
+                                              ? const Color(0xFFFF6F00)
+                                              : const Color(0xFF0D47A1),
+                                          size: 20,
+                                        ),
+                                      ),
+                                      title: Text(
+                                        location.displayName,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 15,
+                                          fontWeight: location.isPopular
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                        ),
+                                      ),
+                                      subtitle: location.parentName != null
+                                          ? Text(
+                                              location.type == 'city'
+                                                  ? 'Kota'
+                                                  : 'Kecamatan',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                            )
+                                          : null,
+                                      trailing: Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 14,
+                                        color: Colors.grey[400],
+                                      ),
+                                    ),
                                   );
                                 },
-                                onSelected: (city) {
+                                onSelected: (location) {
                                   setState(() {
-                                    _tempatBerangkat = city;
-                                    _departureController.text = city;
+                                    _tempatBerangkat = location.displayName;
+                                    _departureController.text =
+                                        location.displayName;
                                     _tujuan = null;
                                     _destinationController.clear();
                                   });
-                                  provider.loadDestinationCities(city);
+                                  // Load destinations menggunakan API provider existing
+                                  provider.loadDestinationCities(location.name);
                                 },
                               ),
                               const SizedBox(height: 20),
-                              TypeAheadField<String>(
+                              TypeAheadField<Location>(
                                 controller: _destinationController,
                                 builder: (context, controller, focusNode) {
                                   return TextFormField(
                                     controller: controller,
                                     focusNode: focusNode,
                                     enabled: _tempatBerangkat != null,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                     decoration: InputDecoration(
                                       labelText: 'Tujuan',
-                                      prefixIcon: const Icon(Icons.flag),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                      labelStyle: GoogleFonts.poppins(),
+                                      prefixIcon: Container(
+                                        padding: const EdgeInsets.all(12),
+                                        child: const Icon(
+                                          Icons.flag,
+                                          color: Color(0xFF0D47A1),
+                                        ),
+                                      ),
+                                      suffixIcon: Icon(
+                                        Icons.search,
+                                        color: Colors.grey[400],
+                                        size: 20,
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey[300]!,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF0D47A1),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      disabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey[300]!,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      errorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Colors.red,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      focusedErrorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(
+                                          color: Colors.red,
+                                          width: 2,
+                                        ),
                                       ),
                                       filled: true,
-                                      fillColor: Colors.grey[50],
+                                      fillColor: _tempatBerangkat == null
+                                          ? Colors.grey[100]
+                                          : Colors.white,
                                       hintText: _tempatBerangkat == null
                                           ? 'Pilih tempat berangkat dulu'
                                           : 'Ketik atau pilih tujuan',
+                                      hintStyle: GoogleFonts.poppins(
+                                        color: Colors.grey[400],
+                                      ),
                                     ),
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
@@ -383,31 +622,87 @@ class _HomeScreenState extends State<HomeScreen> {
                                     },
                                   );
                                 },
-                                suggestionsCallback: (pattern) {
+                                suggestionsCallback: (pattern) async {
                                   if (_tempatBerangkat == null) {
                                     return [];
                                   }
                                   if (pattern.isEmpty) {
-                                    return provider.destinationCities;
+                                    // Show popular locations when empty
+                                    return await fetchPopularLocations();
                                   }
-                                  return provider.destinationCities
-                                      .where((city) => city
-                                          .toLowerCase()
-                                          .contains(pattern.toLowerCase()))
-                                      .toList();
+                                  // Search locations by pattern
+                                  return await fetchLocations(pattern);
                                 },
-                                emptyBuilder: (context) =>
-                                    const SizedBox.shrink(),
-                                itemBuilder: (context, city) {
-                                  return ListTile(
-                                    leading: const Icon(Icons.location_city),
-                                    title: Text(city),
+                                emptyBuilder: (context) => Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Text(
+                                    'Tidak ada lokasi ditemukan',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                                itemBuilder: (context, location) {
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: Colors.grey[200]!,
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                    child: ListTile(
+                                      leading: CircleAvatar(
+                                        radius: 20,
+                                        backgroundColor: location.isPopular
+                                            ? const Color(0xFFFF6F00)
+                                                .withOpacity(0.1)
+                                            : const Color(0xFF0D47A1)
+                                                .withOpacity(0.1),
+                                        child: Icon(
+                                          location.type == 'city'
+                                              ? Icons.location_city
+                                              : Icons.flag,
+                                          color: location.isPopular
+                                              ? const Color(0xFFFF6F00)
+                                              : const Color(0xFF0D47A1),
+                                          size: 20,
+                                        ),
+                                      ),
+                                      title: Text(
+                                        location.displayName,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 15,
+                                          fontWeight: location.isPopular
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                        ),
+                                      ),
+                                      subtitle: location.parentName != null
+                                          ? Text(
+                                              location.type == 'city'
+                                                  ? 'Kota'
+                                                  : 'Kecamatan',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                            )
+                                          : null,
+                                      trailing: Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 14,
+                                        color: Colors.grey[400],
+                                      ),
+                                    ),
                                   );
                                 },
-                                onSelected: (city) {
+                                onSelected: (location) {
                                   setState(() {
-                                    _tujuan = city;
-                                    _destinationController.text = city;
+                                    _tujuan = location.displayName;
+                                    _destinationController.text =
+                                        location.displayName;
                                   });
                                 },
                               ),
@@ -495,68 +790,195 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           )
                         else if (provider.poList.isEmpty)
-                          Card(
-                            elevation: 2,
-                            child: Padding(
-                              padding: const EdgeInsets.all(32),
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.search_off,
+                          Container(
+                            padding: const EdgeInsets.all(32),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.grey[300]!,
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.1),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.search_off_rounded,
                                     size: 64,
                                     color: Colors.grey[400],
                                   ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Tidak ada PO ditemukan',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  'Tidak ada PO ditemukan',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 18,
+                                    color: Colors.grey[800],
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Untuk rute $_tempatBerangkat - $_tujuan',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[500],
-                                    ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
                                   ),
-                                ],
-                              ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.route_rounded,
+                                        size: 16,
+                                        color: Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '$_tempatBerangkat → $_tujuan',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          color: Colors.grey[600],
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Coba ubah pencarian atau pilih rute lain',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    color: Colors.grey[500],
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
                           )
                         else ...[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Hasil Pencarian',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey[800],
-                                ),
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  const Color(0xFF0D47A1),
+                                  const Color(0xFF1976D2),
+                                ],
                               ),
-                              Text(
-                                '${provider.poList.length} PO',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      const Color(0xFF0D47A1).withOpacity(0.3),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Rute: $_tempatBerangkat → $_tujuan',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                Colors.white.withOpacity(0.2),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          child: const Icon(
+                                            Icons.search_rounded,
+                                            color: Colors.white,
+                                            size: 24,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'Hasil Pencarian',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        '${provider.poList.length} PO',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF0D47A1),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.route_rounded,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '$_tempatBerangkat → $_tujuan',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           ...provider.poList.map((po) => _buildPOCard(po)),
                         ],
                       ],
@@ -573,19 +995,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPOCard(POModel po) {
     return Card(
-      elevation: 6,
-      margin: const EdgeInsets.only(bottom: 16),
-      shadowColor: const Color(0xFF0D47A1).withOpacity(0.2),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 8,
+      margin: const EdgeInsets.only(bottom: 20),
+      shadowColor: const Color(0xFF0D47A1).withOpacity(0.25),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: const Color(0xFF0D47A1).withOpacity(0.1),
+          width: 1,
+        ),
+      ),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
               Colors.white,
-              const Color(0xFF0D47A1).withOpacity(0.03),
+              const Color(0xFF0D47A1).withOpacity(0.02),
             ],
           ),
         ),
@@ -607,33 +1035,36 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             );
           },
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header with icon and title
                 Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF0D47A1), Color(0xFF1565C0)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF0D47A1), Color(0xFF1976D2)],
                         ),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF0D47A1).withOpacity(0.3),
-                            blurRadius: 8,
+                            color: const Color(0xFF0D47A1).withOpacity(0.4),
+                            blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
                         ],
                       ),
                       child: const Icon(
-                        Icons.business,
+                        Icons.business_rounded,
                         color: Colors.white,
-                        size: 36,
+                        size: 32,
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -643,157 +1074,119 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Text(
                             po.nama,
-                            style: const TextStyle(
-                              fontSize: 20,
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF0D47A1),
+                              color: const Color(0xFF0D47A1),
                               letterSpacing: 0.3,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      const Color(0xFF1565C0).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: const Color(0xFF1565C0)
-                                        .withOpacity(0.3),
-                                  ),
-                                ),
-                                child: Text(
-                                  po.companyCode,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1565C0),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFF1B5E20),
-                                      Color(0xFF2E7D32)
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF1B5E20)
-                                          .withOpacity(0.3),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.directions_bus,
-                                      size: 14,
-                                      color: Colors.white,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${po.vehicleCount} Kendaraan',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          const SizedBox(height: 4),
+                          Text(
+                            po.companyCode,
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[600],
+                            ),
                           ),
                         ],
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: const Color(0xFF0D47A1).withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
-                        Icons.chevron_right,
+                        Icons.chevron_right_rounded,
                         color: Color(0xFF0D47A1),
-                        size: 28,
+                        size: 24,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
+                // Info Pills
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildInfoPill(
+                      icon: Icons.directions_bus_rounded,
+                      label: '${po.vehicleCount} Kendaraan',
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF1B5E20), Color(0xFF388E3C)],
+                      ),
+                    ),
+                    _buildInfoPill(
+                      icon: Icons.star_rounded,
+                      label: 'Premium',
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF6F00), Color(0xFFFF8F00)],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Contact Info Card
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[200]!),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFF0D47A1).withOpacity(0.1),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Column(
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.phone_outlined,
-                            size: 20,
-                            color: Colors.grey[700],
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              po.phone,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                          ),
-                        ],
+                      _buildContactRow(
+                        icon: Icons.phone_rounded,
+                        text: po.phone,
+                        color: const Color(0xFF1976D2),
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 20,
-                            color: Colors.grey[700],
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              po.address,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                          ),
-                        ],
+                      Container(
+                        height: 1,
+                        color: Colors.grey[200],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildContactRow(
+                        icon: Icons.location_on_rounded,
+                        text: po.address,
+                        color: const Color(0xFFE53935),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
+                const SizedBox(height: 18),
+                // Action Button
+                Container(
                   width: double.infinity,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0D47A1), Color(0xFF1976D2)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0D47A1).withOpacity(0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.push(
@@ -813,24 +1206,34 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      elevation: 2,
-                      shadowColor: const Color(0xFF0D47A1).withOpacity(0.4),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.calendar_today, size: 18),
-                        SizedBox(width: 8),
+                        const Icon(
+                          Icons.calendar_today_rounded,
+                          size: 20,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 10),
                         Text(
                           'Lihat Jadwal & Harga',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
                           ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 18,
+                          color: Colors.white,
                         ),
                       ],
                     ),
@@ -841,6 +1244,80 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildInfoPill({
+    required IconData icon,
+    required String label,
+    required Gradient gradient,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactRow({
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[700],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

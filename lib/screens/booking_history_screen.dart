@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import 'package:intl/intl.dart';
@@ -90,10 +91,15 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Riwayat Booking'),
+        title: Text(
+          'Riwayat Booking',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
         backgroundColor: const Color(0xFF0D47A1),
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -110,15 +116,16 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                       const SizedBox(height: 16),
                       Text(
                         'Belum ada riwayat booking',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: 18,
+                          fontWeight: FontWeight.w600,
                           color: Colors.grey[600],
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Pesan travel Anda sekarang!',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: 14,
                           color: Colors.grey[500],
                         ),
@@ -142,13 +149,13 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
 
   Widget _buildBookingCard(dynamic booking) {
     return Card(
-      elevation: 3,
+      elevation: 4,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -158,10 +165,10 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                 Expanded(
                   child: Text(
                     booking['po_name'] ?? 'Travel',
-                    style: const TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0D47A1),
+                      color: const Color(0xFF0D47A1),
                     ),
                   ),
                 ),
@@ -174,19 +181,20 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                     color: _getStatusColor(booking['status'] ??
                             booking['booking_status'] ??
                             '')
-                        .withOpacity(0.1),
+                        .withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: _getStatusColor(
                           booking['status'] ?? booking['booking_status'] ?? ''),
+                      width: 1.5,
                     ),
                   ),
                   child: Text(
                     _getStatusText(
                         booking['status'] ?? booking['booking_status'] ?? ''),
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                       color: _getStatusColor(
                           booking['status'] ?? booking['booking_status'] ?? ''),
                     ),
@@ -202,7 +210,7 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                 Expanded(
                   child: Text(
                     '${booking['origin'] ?? '-'} → ${booking['destination'] ?? '-'}',
-                    style: const TextStyle(fontSize: 16),
+                    style: GoogleFonts.poppins(fontSize: 15),
                   ),
                 ),
               ],
@@ -216,7 +224,7 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                   booking['departure_time']?.toString().split('T')[0] ??
                       booking['booking_date']?.toString() ??
                       '-',
-                  style: const TextStyle(fontSize: 14),
+                  style: GoogleFonts.poppins(fontSize: 14),
                 ),
               ],
             ),
@@ -227,7 +235,7 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                 const SizedBox(width: 8),
                 Text(
                   'Kursi: ${booking['seats'] ?? booking['num_passengers'] ?? '-'}',
-                  style: const TextStyle(fontSize: 14),
+                  style: GoogleFonts.poppins(fontSize: 14),
                 ),
               ],
             ),
@@ -237,17 +245,17 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
               children: [
                 Text(
                   'Total Bayar',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: Colors.grey[600],
                   ),
                 ),
                 Text(
                   _formatCurrency(booking['total_price'] ?? 0),
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
+                    color: const Color(0xFF0D47A1),
                   ),
                 ),
               ],

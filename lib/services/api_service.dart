@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
+import '../models/info_item_model.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -610,6 +611,92 @@ class ApiService {
     } catch (e) {
       return _handleError(e);
     }
+  }
+
+  // ==================== INFO & PROMO ENDPOINTS ====================
+
+  /// GET /api/info/items - Get active info items
+  Future<List<InfoItemModel>> getInfoItems() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/info/items'),
+      );
+      final data = _parseResponse(response);
+      if (data['success'] == true && data['data'] != null) {
+        return (data['data'] as List)
+            .map((item) => InfoItemModel.fromJson(item))
+            .where((item) => item.isActive)
+            .toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      }
+      // Return default items if API fails
+      return _getDefaultInfoItems();
+    } catch (e) {
+      return _getDefaultInfoItems();
+    }
+  }
+
+  /// GET /api/info/promos - Get active promos
+  Future<List<PromoModel>> getPromos() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/info/promos'),
+      );
+      final data = _parseResponse(response);
+      if (data['success'] == true && data['data'] != null) {
+        return (data['data'] as List)
+            .map((item) => PromoModel.fromJson(item))
+            .where((item) => item.isActive)
+            .toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      }
+      // Return default promo if API fails
+      return _getDefaultPromos();
+    } catch (e) {
+      return _getDefaultPromos();
+    }
+  }
+
+  // Default fallback data
+  List<InfoItemModel> _getDefaultInfoItems() {
+    return [
+      InfoItemModel(
+        id: 1,
+        text: '• Pesan tiket minimal 2 jam sebelum keberangkatan',
+        isActive: true,
+        sortOrder: 1,
+      ),
+      InfoItemModel(
+        id: 2,
+        text: '• Harap datang 15 menit sebelum jadwal',
+        isActive: true,
+        sortOrder: 2,
+      ),
+      InfoItemModel(
+        id: 3,
+        text: '• Bawa bukti pembayaran untuk ditunjukkan',
+        isActive: true,
+        sortOrder: 3,
+      ),
+      InfoItemModel(
+        id: 4,
+        text: '• Konfirmasi pembayaran via WhatsApp',
+        isActive: true,
+        sortOrder: 4,
+      ),
+    ];
+  }
+
+  List<PromoModel> _getDefaultPromos() {
+    return [
+      PromoModel(
+        id: 1,
+        title: 'Promo Spesial!',
+        description: 'Diskon 10% untuk pengguna baru',
+        isActive: true,
+        sortOrder: 1,
+      ),
+    ];
   }
 
   // ==================== HEALTH CHECK ====================

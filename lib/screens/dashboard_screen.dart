@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'booking_history_screen.dart';
@@ -81,11 +82,12 @@ class DashboardContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final authService = AuthService();
     final userName = authService.userFullName ?? 'Pengguna';
+    final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : 'P';
 
     return SingleChildScrollView(
       child: Column(
         children: [
-          // Header Section
+          // Header Section with Profile
           Container(
             width: double.infinity,
             decoration: const BoxDecoration(
@@ -102,32 +104,33 @@ class DashboardContent extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
             child: Column(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.waving_hand,
-                    size: 48,
-                    color: Colors.white,
+                // Profile Avatar
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor: Colors.white,
+                  child: Text(
+                    userInitial,
+                    style: GoogleFonts.poppins(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF0D47A1),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'Halo, $userName!',
-                  style: const TextStyle(
-                    fontSize: 28,
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Mau kemana hari ini?',
-                  style: TextStyle(
-                    fontSize: 16,
+                Text(
+                  'Mau di Hantar kemana hari ini?',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
                     color: Colors.white,
                   ),
                 ),
@@ -166,12 +169,13 @@ class DashboardContent extends StatelessWidget {
                       _buildSquareMenuCard(
                         context: context,
                         icon: Icons.inventory_2,
-                        title: 'Titip\nBarang',
+                        title: 'Hantar\nBarang',
                         color: Colors.orange,
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Fitur Titip Barang segera hadir!'),
+                              content:
+                                  Text('Fitur Hantar Barang segera hadir!'),
                               backgroundColor: Colors.orange,
                             ),
                           );
