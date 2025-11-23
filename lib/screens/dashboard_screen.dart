@@ -281,29 +281,6 @@ class DashboardContent extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      // Row 3: Riwayat Booking (sejajar dengan row 1 & 2)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildSquareMenuCard(
-                            context: context,
-                            icon: Icons.receipt_long,
-                            iconColor: const Color(0xFF43A047),
-                            title: 'Riwayat\nBooking',
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const BookingHistoryScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                          // Placeholder untuk menu baru (bisa ditambahkan di sini)
-                        ],
-                      ),
                     ],
                   ),
 
