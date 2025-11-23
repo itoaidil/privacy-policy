@@ -409,10 +409,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                       if (value == null || value.isEmpty) {
                                         return 'Pilih tempat berangkat';
                                       }
-                                      if (!provider.departureCities
-                                          .contains(value)) {
-                                        return 'Kota tidak valid';
-                                      }
                                       return null;
                                     },
                                   );
@@ -580,10 +576,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
                                         return 'Pilih tujuan';
-                                      }
-                                      if (!provider.destinationCities
-                                          .contains(value)) {
-                                        return 'Kota tidak valid';
                                       }
                                       return null;
                                     },
