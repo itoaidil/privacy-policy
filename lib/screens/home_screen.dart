@@ -473,9 +473,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       subtitle: location.parentName != null
                                           ? Text(
-                                              location.type == 'city'
-                                                  ? 'Kota'
-                                                  : 'Kecamatan',
+                                              location.parentName!,
                                               style: GoogleFonts.poppins(
                                                 fontSize: 12,
                                                 color: Colors.grey[600],
@@ -650,9 +648,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       subtitle: location.parentName != null
                                           ? Text(
-                                              location.type == 'city'
-                                                  ? 'Kota'
-                                                  : 'Kecamatan',
+                                              location.parentName!,
                                               style: GoogleFonts.poppins(
                                                 fontSize: 12,
                                                 color: Colors.grey[600],
