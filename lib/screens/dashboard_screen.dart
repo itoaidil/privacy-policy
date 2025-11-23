@@ -57,18 +57,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onTap: _onItemTapped,
         selectedItemColor: const Color(0xFF0D47A1),
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'Riwayat',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Akun',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Riwayat'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Akun'),
         ],
       ),
     );
@@ -129,10 +120,7 @@ class DashboardContent extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   'Mau di Hantar kemana hari ini?',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Colors.white,
-                  ),
+                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.white),
                 ),
               ],
             ),
@@ -145,78 +133,192 @@ class DashboardContent extends StatelessWidget {
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  // Menu Grid (3 menu dalam grid dengan ukuran 78dp)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  // Menu Grid (10 menu dalam grid 4 per row)
+                  Column(
                     children: [
-                      // Booking Travel
-                      _buildSquareMenuCard(
-                        context: context,
-                        icon: Icons.directions_bus,
-                        title: 'Booking\nTravel',
-                        color: const Color(0xFF0D47A1),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const HomeScreen(),
-                            ),
-                          );
-                        },
+                      // Row 1: 4 menu pertama
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Hantar Pulang
+                          _buildSquareMenuCard(
+                            context: context,
+                            icon: Icons.home,
+                            iconColor: const Color(0xFF0D47A1),
+                            title: 'Hantar\nPulang',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const HomeScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 10),
+                          _buildSquareMenuCard(
+                            context: context,
+                            icon: Icons.inventory_2,
+                            iconColor: const Color(0xFFFF8F00),
+                            title: 'Hantar\nBarang',
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Fitur Hantar Barang segera hadir!',
+                                  ),
+                                  backgroundColor: Color(0xFFFF8F00),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 10),
+                          _buildSquareMenuCard(
+                            context: context,
+                            icon: Icons.tour,
+                            iconColor: const Color(0xFF8E24AA),
+                            title: 'Hantar\nKeliling',
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Fitur Hantar Keliling segera hadir!',
+                                  ),
+                                  backgroundColor: Color(0xFF8E24AA),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 10),
+                          _buildSquareMenuCard(
+                            context: context,
+                            icon: Icons.local_shipping,
+                            iconColor: const Color(0xFFE91E63),
+                            title: 'Hantar\nCargo',
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Fitur Hantar Cargo segera hadir!',
+                                  ),
+                                  backgroundColor: Color(0xFFE91E63),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 14),
-                      // Titip Barang
-                      _buildSquareMenuCard(
-                        context: context,
-                        icon: Icons.inventory_2,
-                        title: 'Hantar\nBarang',
-                        color: Colors.orange,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content:
-                                  Text('Fitur Hantar Barang segera hadir!'),
-                              backgroundColor: Colors.orange,
-                            ),
-                          );
-                        },
+                      const SizedBox(height: 10),
+                      // Row 2: 4 menu berikutnya
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildSquareMenuCard(
+                            context: context,
+                            icon: Icons.mosque,
+                            iconColor: const Color(0xFF00BCD4),
+                            title: 'Hantar\nUmroh',
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Fitur Hantar Umroh segera hadir!',
+                                  ),
+                                  backgroundColor: Color(0xFF00BCD4),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 10),
+                          _buildSquareMenuCard(
+                            context: context,
+                            icon: Icons.camera_alt,
+                            iconColor: const Color(0xFF9C27B0),
+                            title: 'Hantar\nFotografi',
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Fitur Hantar Fotografi segera hadir!',
+                                  ),
+                                  backgroundColor: Color(0xFF9C27B0),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 10),
+                          _buildSquareMenuCard(
+                            context: context,
+                            icon: Icons.campaign,
+                            iconColor: const Color(0xFFFF5722),
+                            title: 'Hantar\nIklan',
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Fitur Hantar Iklan segera hadir!',
+                                  ),
+                                  backgroundColor: Color(0xFFFF5722),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 10),
+                          _buildSquareMenuCard(
+                            context: context,
+                            icon: Icons.directions_car,
+                            iconColor: const Color(0xFF607D8B),
+                            title: 'Sewa\nMobil',
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content:
+                                      Text('Fitur Sewa Mobil segera hadir!'),
+                                  backgroundColor: Color(0xFF607D8B),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 14),
-                      // Riwayat Booking
-                      _buildSquareMenuCard(
-                        context: context,
-                        icon: Icons.receipt_long,
-                        title: 'Riwayat\nBooking',
-                        color: Colors.green,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const BookingHistoryScreen(),
-                            ),
-                          );
-                        },
+                      const SizedBox(height: 10),
+                      // Row 3: Riwayat Booking (sejajar dengan row 1 & 2)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildSquareMenuCard(
+                            context: context,
+                            icon: Icons.receipt_long,
+                            iconColor: const Color(0xFF43A047),
+                            title: 'Riwayat\nBooking',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const BookingHistoryScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          // Placeholder untuk menu baru (bisa ditambahkan di sini)
+                        ],
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 220),
 
-                  // Promo Banner
+                  // Promo Banner (moved to bottom) (moved to bottom)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.amber.shade300, Colors.orange.shade400],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: const Color(0xFFFF6F00),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.orange.withOpacity(0.3),
+                          color: const Color(0xFFFF6F00).withOpacity(0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -275,8 +377,8 @@ class DashboardContent extends StatelessWidget {
   Widget _buildSquareMenuCard({
     required BuildContext context,
     required IconData icon,
+    required Color iconColor,
     required String title,
-    required Color color,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -286,18 +388,11 @@ class DashboardContent extends StatelessWidget {
         width: 78,
         height: 78,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Colors.white,
-              color.withOpacity(0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: const Color(0xFF0D47A1).withOpacity(0.08),
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.3),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -306,11 +401,7 @@ class DashboardContent extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 30,
-              color: color,
-            ),
+            Icon(icon, size: 30, color: iconColor),
             const SizedBox(height: 6),
             Text(
               title,
