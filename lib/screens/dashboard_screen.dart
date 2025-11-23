@@ -201,67 +201,6 @@ class DashboardContent extends StatelessWidget {
                     ],
                   ),
 
-                  const SizedBox(height: 30),
-
-                  // Info Banner
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.blue.shade400, Colors.blue.shade600],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withOpacity(0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.info_outline,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'Informasi Penting',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        _buildInfoItem(
-                            '• Pesan tiket minimal 2 jam sebelum keberangkatan'),
-                        _buildInfoItem(
-                            '• Harap datang 15 menit sebelum jadwal'),
-                        _buildInfoItem(
-                            '• Bawa bukti pembayaran untuk ditunjukkan'),
-                        _buildInfoItem('• Konfirmasi pembayaran via WhatsApp'),
-                      ],
-                    ),
-                  ),
-
                   const SizedBox(height: 20),
 
                   // Promo Banner
@@ -384,20 +323,6 @@ class DashboardContent extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 14,
-          color: Colors.white,
-          height: 1.5,
         ),
       ),
     );
