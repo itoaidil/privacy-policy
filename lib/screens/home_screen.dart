@@ -47,8 +47,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String? _tempatBerangkat;
-  String? _tujuan;
+  String? _tempatBerangkat; // Nama asli untuk API
+  String? _tujuan; // Nama asli untuk API
+  String? _tempatBerangkatDisplay; // Display name untuk UI
+  String? _tujuanDisplay; // Display name untuk UI
   DateTime? _tanggalBerangkat;
   final _formKey = GlobalKey<FormState>();
   final _departureController = TextEditingController();
@@ -325,6 +327,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   _tempatBerangkat = _tujuan;
                                                   _tujuan = temp;
 
+                                                  // Swap display names
+                                                  final tempDisplay =
+                                                      _tempatBerangkatDisplay;
+                                                  _tempatBerangkatDisplay =
+                                                      _tujuanDisplay;
+                                                  _tujuanDisplay = tempDisplay;
+
                                                   // Swap text
                                                   final tempText =
                                                       _departureController.text;
@@ -483,10 +492,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                 },
                                 onSelected: (location) {
                                   setState(() {
-                                    _tempatBerangkat = location.displayName;
+                                    _tempatBerangkat =
+                                        location.name; // Nama asli untuk API
+                                    _tempatBerangkatDisplay =
+                                        location.displayName; // Display name
                                     _departureController.text =
                                         location.displayName;
                                     _tujuan = null;
+                                    _tujuanDisplay = null;
                                     _destinationController.clear();
                                   });
                                   // Load destinations menggunakan API provider existing
@@ -656,7 +669,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 },
                                 onSelected: (location) {
                                   setState(() {
-                                    _tujuan = location.displayName;
+                                    _tujuan =
+                                        location.name; // Nama asli untuk API
+                                    _tujuanDisplay =
+                                        location.displayName; // Display name
                                     _destinationController.text =
                                         location.displayName;
                                   });
@@ -806,7 +822,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
-                                        '$_tempatBerangkat → $_tujuan',
+                                        '${_tempatBerangkatDisplay ?? _tempatBerangkat} → ${_tujuanDisplay ?? _tujuan}',
                                         style: GoogleFonts.poppins(
                                           fontSize: 14,
                                           color: Colors.grey[600],
@@ -920,7 +936,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          '$_tempatBerangkat → $_tujuan',
+                                          '${_tempatBerangkatDisplay ?? _tempatBerangkat} → ${_tujuanDisplay ?? _tujuan}',
                                           style: GoogleFonts.poppins(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w500,
