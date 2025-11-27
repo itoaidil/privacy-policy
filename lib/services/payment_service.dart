@@ -12,10 +12,7 @@ class PaymentService {
 
   // Helper method untuk handle HTTP errors
   Map<String, dynamic> _handleError(dynamic error) {
-    return {
-      'success': false,
-      'message': error.toString(),
-    };
+    return {'success': false, 'message': error.toString()};
   }
 
   // Helper method untuk parse response
@@ -57,9 +54,11 @@ class PaymentService {
   }) async {
     try {
       print(
-          '🟦 [PaymentService] Request create-token => $baseUrl/payment/create-token');
+        '🟦 [PaymentService] Request create-token => $baseUrl/payment/create-token',
+      );
       print(
-          '🟦 Payload: booking_id=$bookingId amount=$amount name=$customerName email=$customerEmail phone=${customerPhone ?? ''}');
+        '🟦 Payload: booking_id=$bookingId amount=$amount name=$customerName email=$customerEmail phone=${customerPhone ?? ''}',
+      );
 
       final response = await http.post(
         Uri.parse('$baseUrl/payment/create-token'),
@@ -103,12 +102,14 @@ class PaymentService {
   Future<Map<String, dynamic>> checkPaymentStatus(String orderId) async {
     try {
       print(
-          '🟦 [PaymentService] Request status => $baseUrl/payment/status/$orderId');
+        '🟦 [PaymentService] Request status => $baseUrl/payment/status/$orderId',
+      );
       final response = await http.get(
         Uri.parse('$baseUrl/payment/status/$orderId'),
       );
       print(
-          '🟩 [PaymentService] Status response: ${response.statusCode} ${response.body}');
+        '🟩 [PaymentService] Status response: ${response.statusCode} ${response.body}',
+      );
       final parsed = _parseResponse(response);
       print('🟩 [PaymentService] Parsed status: $parsed');
       return parsed;
@@ -128,11 +129,10 @@ class PaymentService {
   Future<Map<String, dynamic>> getPaymentConfig() async {
     try {
       print('🟦 [PaymentService] Request config => $baseUrl/payment/config');
-      final response = await http.get(
-        Uri.parse('$baseUrl/payment/config'),
-      );
+      final response = await http.get(Uri.parse('$baseUrl/payment/config'));
       print(
-          '🟩 [PaymentService] Config response: ${response.statusCode} ${response.body}');
+        '🟩 [PaymentService] Config response: ${response.statusCode} ${response.body}',
+      );
       final parsed = _parseResponse(response);
       print('🟩 [PaymentService] Parsed config: $parsed');
       return parsed;
@@ -153,11 +153,10 @@ class PaymentService {
   Future<Map<String, dynamic>> testPaymentConnection() async {
     try {
       print('🟦 [PaymentService] Request test => $baseUrl/payment/test');
-      final response = await http.get(
-        Uri.parse('$baseUrl/payment/test'),
-      );
+      final response = await http.get(Uri.parse('$baseUrl/payment/test'));
       print(
-          '🟩 [PaymentService] Test response: ${response.statusCode} ${response.body}');
+        '🟩 [PaymentService] Test response: ${response.statusCode} ${response.body}',
+      );
       final parsed = _parseResponse(response);
       print('🟩 [PaymentService] Parsed test: $parsed');
       return parsed;
@@ -184,19 +183,19 @@ class PaymentService {
   Future<Map<String, dynamic>> forcePaymentSuccess(String orderId) async {
     try {
       print(
-          '🔴 [PaymentService] FORCE SUCCESS => $baseUrl/payment/force-success');
+        '🔴 [PaymentService] FORCE SUCCESS => $baseUrl/payment/force-success',
+      );
       print('🔴 Order ID: $orderId');
 
       final response = await http.post(
         Uri.parse('$baseUrl/payment/force-success'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'order_id': orderId,
-        }),
+        body: json.encode({'order_id': orderId}),
       );
 
       print(
-          '🟩 [PaymentService] Force success response: ${response.statusCode} ${response.body}');
+        '🟩 [PaymentService] Force success response: ${response.statusCode} ${response.body}',
+      );
       final parsed = _parseResponse(response);
       print('🟩 [PaymentService] Parsed force success: $parsed');
       return parsed;
