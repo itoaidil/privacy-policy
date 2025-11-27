@@ -1,24 +1,44 @@
+import 'storage_service.dart';
+
 class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
 
+  final _storageService = StorageService();
   Map<String, dynamic>? _currentUser;
 
-  // Check if user is logged in
+  // Check if user is logged in (memory or storage)
   bool get isLoggedIn => _currentUser != null;
 
   // Get current user data
   Map<String, dynamic>? get currentUser => _currentUser;
 
-  // Set user data after login
-  void setUser(Map<String, dynamic> userData) {
+  // Initialize - load user data from storage if exists
+  Future<bool> initialize() async {
+    try {
+      final isLoggedIn = await _storageService.isLoggedIn();
+      if (isLoggedIn) {
+        _currentUser = await _storageService.getUserData();
+        return _currentUser != null;
+      }
+      return false;
+    } catch (e) {
+      print('Error initializing auth: $e');
+      return false;
+    }
+  }
+
+  // Set user data after login and save to storage
+  Future<void> setUser(Map<String, dynamic> userData) async {
     _currentUser = userData;
+    await _storageService.saveLoginSession(userData);
   }
 
   // Clear user data on logout
-  void logout() {
+  Future<void> logout() async {
     _currentUser = null;
+    await _storageService.clearLoginSession();
   }
 
   // Get user ID
