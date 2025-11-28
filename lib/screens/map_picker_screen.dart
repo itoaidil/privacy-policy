@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' as ll;
+import '../services/location_service.dart';
 
 class MapPickerScreen extends StatefulWidget {
   final String title;
@@ -19,11 +20,13 @@ class MapPickerScreen extends StatefulWidget {
 class _MapPickerScreenState extends State<MapPickerScreen> {
   final MapController _mapController = MapController();
   final TextEditingController _searchCtrl = TextEditingController();
+  final LocationService _locationService = LocationService();
 
   ll.LatLng _center = ll.LatLng(-6.1754, 106.8272); // Jakarta default
   ll.LatLng? _cityCenter; // Pusat kota untuk validasi radius
   bool _loading = false;
   bool _searching = false;
+  bool _gettingLocation = false;
   String? _address;
 
   // Radius maksimum dalam kilometer
@@ -144,6 +147,53 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       }
     } finally {
       if (mounted) setState(() => _searching = false);
+    }
+  }
+
+  // Get user's current location
+  Future<void> _useMyLocation() async {
+    setState(() => _gettingLocation = true);
+    try {
+      final location = await _locationService.getCurrentLocationWithAddress();
+
+      if (location == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Tidak dapat mengakses lokasi. Pastikan GPS aktif dan izin lokasi diberikan.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Update map position
+      _center = ll.LatLng(location['latitude'], location['longitude']);
+      _address = location['address'];
+      _mapController.move(_center, 16);
+
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lokasi ditemukan: ${location['address']}'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _gettingLocation = false);
     }
   }
 
@@ -345,6 +395,22 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 ),
               ],
             ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _gettingLocation ? null : _useMyLocation,
+        icon: _gettingLocation
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : const Icon(Icons.my_location),
+        label: Text(_gettingLocation ? 'Mencari...' : 'Lokasi Saya'),
+        backgroundColor: _gettingLocation ? Colors.grey : null,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }
