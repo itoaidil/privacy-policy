@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'auth/login_screen.dart';
+import 'dashboard_screen.dart';
+import '../services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -11,19 +13,35 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  final _authService = AuthService();
+
   @override
   void initState() {
     super.initState();
-    _navigateToLogin();
+    _checkLoginStatus();
   }
 
-  Future<void> _navigateToLogin() async {
+  Future<void> _checkLoginStatus() async {
+    // Wait for splash animation
     await Future.delayed(const Duration(seconds: 3));
+
+    // Check if user is already logged in
+    final isLoggedIn = await _authService.initialize();
+
     if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
+      if (isLoggedIn) {
+        // User is logged in, go to dashboard
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+        );
+      } else {
+        // User not logged in, go to login screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
     }
   }
 

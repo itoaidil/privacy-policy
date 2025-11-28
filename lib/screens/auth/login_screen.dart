@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         // Simpan data user ke AuthService
-        _authService.setUser(data);
+        await _authService.setUser(data);
 
         // Navigate to dashboard screen after successful login
         Navigator.pushReplacement(
