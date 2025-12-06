@@ -8,6 +8,11 @@ import '../providers/travel_provider.dart';
 import '../models/po_model.dart';
 import 'po_detail_screen.dart';
 import 'map_picker_screen.dart';
+import '../services/location_service.dart';
+import '../services/province_service.dart';
+import '../models/province_model.dart';
+import '../config/feature_flags.dart';
+import '../config/app_config.dart';
 
 // Model untuk Location dari API
 class Location {
@@ -62,19 +67,39 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, double>? _pickupCoord; // {lat, lng}
   Map<String, double>? _dropoffCoord;
 
+  // Location service
+  final LocationService _locationService = LocationService();
+  bool _isLoadingLocation = false;
+  bool _hasAutoDetectedLocation = false;
+
+  // Province service (NEW - for filtering)
+  final ProvinceService _provinceService = ProvinceService();
+  Province? _detectedProvince;
+  Province? _selectedProvince;
+  bool _isDetectingProvince = false;
+
   // Fetch locations dari API
+  // NEW: Support province filtering jika feature enabled
   Future<List<Location>> fetchLocations(String query) async {
     try {
-      final response = await http.get(
-        Uri.parse(
-            'https://travel-api-production-23ae.up.railway.app/api/locations?search=$query&limit=30'),
-      );
+      // Build URL dengan optional province filter
+      String url = '${AppConfig.baseUrl}/locations?search=$query&limit=30';
+
+      // NEW: Add province filter if feature enabled dan province selected
+      if (Features.isProvinceFilteringEnabled && _selectedProvince != null) {
+        url += '&province_id=${_selectedProvince!.id}';
+        Features.log('Filtering by province: ${_selectedProvince!.name}');
+      }
+
+      final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final locations = (data['data'] as List)
             .map((item) => Location.fromJson(item))
             .toList();
+
+        Features.log('Fetched ${locations.length} locations for query: $query');
         return locations;
       }
       return [];
@@ -112,7 +137,244 @@ class _HomeScreenState extends State<HomeScreen> {
     // Load daftar tempat berangkat saat pertama kali dibuka
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TravelProvider>().loadDepartureCities();
+
+      // NEW: Province detection jika feature enabled
+      if (Features.isProvinceFilteringEnabled) {
+        _autoDetectProvince();
+      } else {
+        // OLD: Location detection (existing behavior)
+        _autoDetectUserLocation();
+      }
     });
+  }
+
+  /// NEW: Auto-detect province dari GPS (Province Filtering Feature)
+  Future<void> _autoDetectProvince() async {
+    if (_hasAutoDetectedLocation) return;
+
+    setState(() => _isDetectingProvince = true);
+
+    try {
+      Features.log('Starting province detection...');
+
+      // Get current location
+      final locationData =
+          await _locationService.getCurrentLocationWithAddress();
+
+      if (locationData != null && mounted) {
+        final address = locationData['address'] as String;
+        final lat = locationData['latitude'] as double;
+        final lng = locationData['longitude'] as double;
+
+        // Detect province from coordinates
+        final province =
+            await _provinceService.detectProvinceFromCoordinates(lat, lng);
+
+        if (province != null && mounted) {
+          setState(() {
+            _detectedProvince = province;
+            _selectedProvince = province; // Auto-select detected province
+            _pickupAddress = address;
+            _pickupCoord = {'lat': lat, 'lng': lng};
+            _hasAutoDetectedLocation = true;
+          });
+
+          Features.log('Province detected: ${province.name}');
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.location_on, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('Lokasi Anda: ${province.name}'),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
+                action: SnackBarAction(
+                  label: 'Ubah',
+                  textColor: Colors.white,
+                  onPressed: () => _showProvinceSelector(),
+                ),
+              ),
+            );
+          }
+        } else {
+          // Province not found, fallback to old location detection
+          Features.log('Province not detected, using fallback');
+          _autoDetectUserLocation();
+        }
+      }
+    } catch (e) {
+      Features.log('Error detecting province: $e');
+      // Fallback to old location detection
+      _autoDetectUserLocation();
+    } finally {
+      if (mounted) {
+        setState(() => _isDetectingProvince = false);
+      }
+    }
+  }
+
+  /// Show province selector dialog (untuk override manual)
+  Future<void> _showProvinceSelector() async {
+    final provinces = await _provinceService.getAllProvinces();
+
+    if (!mounted || provinces.isEmpty) return;
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pilih Provinsi'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: provinces.map((province) {
+              return ListTile(
+                title: Text(province.name),
+                trailing: _selectedProvince?.id == province.id
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : null,
+                onTap: () {
+                  setState(() => _selectedProvince = province);
+                  Navigator.pop(context);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Provinsi diubah ke: ${province.name}'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Auto-detect lokasi user saat pertama kali buka
+  Future<void> _autoDetectUserLocation() async {
+    if (_hasAutoDetectedLocation) return; // Sudah pernah detect
+
+    setState(() => _isLoadingLocation = true);
+
+    try {
+      final locationData =
+          await _locationService.getCurrentLocationWithAddress();
+
+      if (locationData != null && mounted) {
+        final address = locationData['address'] as String;
+        final lat = locationData['latitude'] as double;
+        final lng = locationData['longitude'] as double;
+
+        // Ambil nama kota dari address untuk API
+        final cityName = _extractCityFromAddress(address);
+
+        setState(() {
+          _pickupAddress = address;
+          _pickupCoord = {'lat': lat, 'lng': lng};
+          _hasAutoDetectedLocation = true;
+
+          // Set tempat berangkat jika berhasil extract city
+          if (cityName != null) {
+            _tempatBerangkat = cityName;
+            _tempatBerangkatDisplay = cityName;
+            _departureController.text = cityName;
+          }
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.location_on, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                        'Lokasi Anda: ${address.length > 50 ? address.substring(0, 50) + '...' : address}'),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error auto-detecting location: \$e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.warning, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                      'Tidak bisa mendeteksi lokasi. Silakan pilih manual.'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: () => _autoDetectUserLocation(),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingLocation = false);
+      }
+    }
+  }
+
+  /// Extract nama kota dari address string
+  String? _extractCityFromAddress(String address) {
+    // Format address biasanya: Jalan, Kelurahan, Kecamatan, Kota, Provinsi
+    final parts = address.split(',').map((e) => e.trim()).toList();
+
+    // Cari yang mengandung kata kunci kota
+    for (var part in parts) {
+      // Skip jalan dan kelurahan (biasanya di awal)
+      if (part.toLowerCase().contains('jl') ||
+          part.toLowerCase().contains('jalan')) continue;
+
+      // Ambil yang mengandung nama kota besar
+      if (part.toLowerCase().contains('padang') ||
+          part.toLowerCase().contains('bukittinggi') ||
+          part.toLowerCase().contains('payakumbuh') ||
+          part.toLowerCase().contains('solok') ||
+          part.toLowerCase().contains('pariaman') ||
+          part.toLowerCase().contains('jakarta') ||
+          part.toLowerCase().contains('bandung') ||
+          part.toLowerCase().contains('medan') ||
+          part.toLowerCase().contains('surabaya')) {
+        return part;
+      }
+    }
+
+    // Fallback: ambil part ketiga atau keempat (biasanya kota)
+    if (parts.length >= 4) return parts[3];
+    if (parts.length >= 3) return parts[2];
+
+    return null;
   }
 
   Future<void> _pickLocation({required bool isPickup}) async {
@@ -256,6 +518,86 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.all(24),
                           child: Column(
                             children: [
+                              // NEW: Province indicator (jika feature enabled)
+                              if (Features.isProvinceFilteringEnabled &&
+                                  _selectedProvince != null)
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[50],
+                                    borderRadius: BorderRadius.circular(8),
+                                    border:
+                                        Border.all(color: Colors.blue[200]!),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.location_city,
+                                          color: Colors.blue[700], size: 20),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Menampilkan travel di ${_selectedProvince!.name}',
+                                          style: TextStyle(
+                                            color: Colors.blue[700],
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                      InkWell(
+                                        onTap: _showProvinceSelector,
+                                        child: Text(
+                                          'Ubah',
+                                          style: TextStyle(
+                                            color: Colors.blue[700],
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            decoration:
+                                                TextDecoration.underline,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                              // Loading province indicator
+                              if (_isDetectingProvince)
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                            Colors.blue[700]!,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          'Mendeteksi lokasi Anda...',
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
                               // Error message
                               if (provider.errorMessage != null)
                                 Padding(
