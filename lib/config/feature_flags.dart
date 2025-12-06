@@ -4,7 +4,7 @@
 class FeatureFlags {
   // Province-based location filtering
   // Set to false untuk rollback ke behavior lama tanpa app update
-  static const bool enableProvinceFiltering = false; // 🚩 TOGGLE THIS
+  static const bool enableProvinceFiltering = true; // 🚩 TOGGLE THIS
 
   // Debug mode untuk print logs
   static const bool debugMode = true;
