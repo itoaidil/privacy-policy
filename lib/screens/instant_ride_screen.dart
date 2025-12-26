@@ -31,6 +31,9 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
   String? _itemPhotoUrl;
   bool _deliveryGuarantee = false;
 
+  // Recipient details (filled after first confirm)
+  RecipientInfo? _recipientInfo;
+
   static const int _testDriverUserId = 12; // TEMP: for end-to-end test
 
   static const List<String> _itemTypes = [
@@ -335,19 +338,14 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
 
                     // Vehicle Selection
                     Text(
-                      'Pilih Kendaraan',
+                      'Pilih Kendaraan (terakhir)',
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 12),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: _buildVehicleChips(),
-                      ),
-                    ),
+                    _buildVehicleSummary(),
                     const SizedBox(height: 24),
 
                     // Find Driver Button
@@ -355,7 +353,13 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
                       onPressed: (_pickupAddress != null &&
                               _destinationAddress != null &&
                               _allowedVehicles.contains(_selectedVehicle))
-                          ? _findDriver
+                          ? () {
+                              if (_recipientInfo == null) {
+                                _openRecipientForm();
+                              } else {
+                                _openReviewOrder();
+                              }
+                            }
                           : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CAF50),
@@ -367,7 +371,7 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
                         elevation: 2,
                       ),
                       child: Text(
-                        'Cari Kurir',
+                        _recipientInfo == null ? 'Confirm' : 'Review Order',
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -377,6 +381,75 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
                   ],
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVehicleSummary() {
+    final display = {
+      'motor': {'emoji': '🏍️', 'name': 'Motor', 'price': 'Rp 15.000'},
+      'sepeda': {'emoji': '🚲', 'name': 'Sepeda', 'price': 'Rp 8.000'},
+      'sepatu_roda': {
+        'emoji': '🛼',
+        'name': 'Sepatu Roda',
+        'price': 'Rp 7.000'
+      },
+      'wheels': {'emoji': '🛴', 'name': 'Wheels', 'price': 'Rp 9.000'},
+    }[_selectedVehicle];
+
+    if (display == null) {
+      return Text(
+        'Pilih titik & berat untuk melihat opsi kendaraan',
+        style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600]),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Row(
+        children: [
+          Text(
+            display['emoji']!,
+            style: const TextStyle(fontSize: 28),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  display['name']!,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  display['price']!,
+                  style: GoogleFonts.poppins(
+                      fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: _allowedVehicles.length > 1
+                ? () {
+                    _cycleVehicle();
+                  }
+                : null,
+            child: Text(
+              'Ganti',
+              style: GoogleFonts.poppins(
+                  fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -437,58 +510,6 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
     );
   }
 
-  Widget _buildVehicleOption(
-    String value,
-    String emoji,
-    String name,
-    String price,
-  ) {
-    final isSelected = _selectedVehicle == value;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedVehicle = value;
-        });
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF4CAF50) : Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF4CAF50) : Colors.grey[300]!,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          children: [
-            Text(
-              emoji,
-              style: const TextStyle(fontSize: 32),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              name,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : Colors.black87,
-              ),
-            ),
-            Text(
-              price,
-              style: GoogleFonts.poppins(
-                fontSize: 11,
-                color: isSelected ? Colors.white : Colors.grey[600],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _showLocationPicker({required bool isPickup}) async {
     final result = await Navigator.push(
       context,
@@ -518,68 +539,6 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
       });
       _recalculateOptions();
     }
-  }
-
-  List<Widget> _buildVehicleChips() {
-    // Mapping display for each option
-    final items = <Map<String, String>>[];
-    for (final v in _allowedVehicles) {
-      switch (v) {
-        case 'sepeda':
-          items.add({
-            'value': 'sepeda',
-            'emoji': '🚲',
-            'name': 'Sepeda',
-            'price': 'Rp 8.000'
-          });
-          break;
-        case 'sepatu_roda':
-          items.add({
-            'value': 'sepatu_roda',
-            'emoji': '🛼',
-            'name': 'Sepatu Roda',
-            'price': 'Rp 7.000'
-          });
-          break;
-        case 'wheels':
-          items.add({
-            'value': 'wheels',
-            'emoji': '🛴',
-            'name': 'Wheels',
-            'price': 'Rp 9.000'
-          });
-          break;
-        case 'motor':
-          items.add({
-            'value': 'motor',
-            'emoji': '🏍️',
-            'name': 'Motor',
-            'price': 'Rp 15.000'
-          });
-          break;
-      }
-    }
-
-    if (items.isEmpty) {
-      return [
-        Text(
-          'Pilih titik & berat untuk melihat opsi kendaraan',
-          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600]),
-        )
-      ];
-    }
-
-    return [
-      for (int i = 0; i < items.length; i++) ...[
-        _buildVehicleOption(
-          items[i]['value']!,
-          items[i]['emoji']!,
-          items[i]['name']!,
-          items[i]['price']!,
-        ),
-        if (i != items.length - 1) const SizedBox(width: 12),
-      ]
-    ];
   }
 
   void _recalculateOptions() {
@@ -618,6 +577,15 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
     });
   }
 
+  void _cycleVehicle() {
+    if (_allowedVehicles.isEmpty) return;
+    final currentIndex = _allowedVehicles.indexOf(_selectedVehicle);
+    final nextIndex = (currentIndex + 1) % _allowedVehicles.length;
+    setState(() {
+      _selectedVehicle = _allowedVehicles[nextIndex];
+    });
+  }
+
   double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
     const R = 6371.0; // Earth radius in KM
     final dLat = _deg2rad(lat2 - lat1);
@@ -633,8 +601,61 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
 
   double _deg2rad(double deg) => deg * (math.pi / 180.0);
 
-  Future<void> _findDriver() async {
-    if (_pickupAddress == null || _destinationAddress == null) return;
+  Future<void> _openRecipientForm() async {
+    final info = await Navigator.push<RecipientInfo?>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RecipientFormScreen(
+          initialAddress: _destinationAddress,
+          initialContactName: _recipientInfo?.contactName,
+          initialContactNumber: _recipientInfo?.contactNumber,
+          initialFloorUnit: _recipientInfo?.floorUnit,
+          initialNote: _recipientInfo?.noteToDriver,
+        ),
+      ),
+    );
+
+    if (info != null) {
+      setState(() {
+        _recipientInfo = info;
+      });
+    }
+  }
+
+  Future<void> _openReviewOrder() async {
+    if (_pickupAddress == null ||
+        _destinationAddress == null ||
+        _recipientInfo == null) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReviewOrderScreen(
+          pickupAddress: _pickupAddress!,
+          destinationAddress: _destinationAddress!,
+          recipient: _recipientInfo!,
+          vehicle: _selectedVehicle,
+          itemSize: _itemSize,
+          itemType: _itemType,
+          deliveryGuarantee: _deliveryGuarantee,
+          onBook: _simulateBookDelivery,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _simulateBookDelivery() async {
+    if (_pickupAddress == null ||
+        _destinationAddress == null ||
+        _recipientInfo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Data tidak lengkap'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     // Map vehicle selection to backend values
     final vehicleType = {
@@ -657,7 +678,7 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Mencari driver...',
+              'Memproses pesanan...',
               style: GoogleFonts.poppins(fontSize: 16),
               textAlign: TextAlign.center,
             ),
@@ -667,9 +688,8 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
     );
 
     try {
-      // Step 1: Create booking
       final bookingUrl =
-          Uri.parse('${AppConfig.baseUrl}/api/bookings/delivery/create');
+          Uri.parse('${AppConfig.baseUrl}/bookings/delivery/create');
 
       final bookingPayload = {
         'customer_id': _testDriverUserId,
@@ -681,12 +701,18 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
         'dropoff_lat': _destinationCoord?['lat'],
         'dropoff_lng': _destinationCoord?['lng'],
         'distance_km': _distanceKm ?? 0,
-        'package_weight_kg': _packageWeightKg ?? 0,
+        'total_fare': _calculateTotalFare(vehicleType),
         // Item details
         'item_size': _itemSize,
         'item_type': _itemType,
         'item_photo_url': _itemPhotoUrl,
         'delivery_guarantee': _deliveryGuarantee,
+        'guarantee_fee': _deliveryGuarantee ? _guaranteeFee : 0,
+        // Recipient details
+        'recipient_name': _recipientInfo!.contactName,
+        'recipient_phone': _recipientInfo!.contactNumber,
+        'recipient_address_detail': _recipientInfo!.floorUnit,
+        'recipient_note_to_driver': _recipientInfo!.noteToDriver,
       };
 
       final bookingRes = await http.post(
@@ -695,51 +721,27 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
         body: jsonEncode(bookingPayload),
       );
 
-      if (bookingRes.statusCode != 201) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal membuat booking: ${bookingRes.statusCode}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      final bookingData = jsonDecode(bookingRes.body);
-      final bookingId = bookingData['booking_id'];
-
-      // Step 2: Execute wave 1 broadcast
-      final broadcastUrl = Uri.parse('${AppConfig.baseUrl}/api/broadcast/wave');
-
-      final broadcastPayload = {
-        'booking_id': bookingId,
-        'wave': 1, // Wave 1: top 5 drivers
-      };
-
-      final broadcastRes = await http.post(
-        broadcastUrl,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(broadcastPayload),
-      );
-
       Navigator.pop(context); // Close loading dialog
 
-      if (broadcastRes.statusCode == 200) {
-        final waveData = jsonDecode(broadcastRes.body);
-        final drivers = waveData['drivers'] as List? ?? [];
+      if (bookingRes.statusCode == 201) {
+        final bookingData = jsonDecode(bookingRes.body);
+        final bookingId = bookingData['booking_id'];
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${drivers.length} driver sedang mencari...'),
+            content: Text('Pesanan berhasil dibuat! ID: $bookingId'),
             backgroundColor: const Color(0xFF4CAF50),
           ),
         );
+
+        // Go back to main screen
+        Navigator.pop(context); // Close review order
+        Navigator.pop(context); // Close instant ride
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gagal broadcast: ${broadcastRes.statusCode}'),
-            backgroundColor: Colors.orange,
+            content: Text('Gagal membuat pesanan: ${bookingRes.statusCode}'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -752,5 +754,385 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
         ),
       );
     }
+  }
+}
+
+class RecipientInfo {
+  final String address;
+  final String? floorUnit;
+  final String contactName;
+  final String contactNumber;
+  final String? noteToDriver;
+  final bool savePlace;
+
+  RecipientInfo({
+    required this.address,
+    required this.contactName,
+    required this.contactNumber,
+    this.floorUnit,
+    this.noteToDriver,
+    this.savePlace = false,
+  });
+}
+
+class RecipientFormScreen extends StatefulWidget {
+  final String? initialAddress;
+  final String? initialFloorUnit;
+  final String? initialContactName;
+  final String? initialContactNumber;
+  final String? initialNote;
+
+  const RecipientFormScreen({
+    super.key,
+    this.initialAddress,
+    this.initialFloorUnit,
+    this.initialContactName,
+    this.initialContactNumber,
+    this.initialNote,
+  });
+
+  @override
+  State<RecipientFormScreen> createState() => _RecipientFormScreenState();
+}
+
+class _RecipientFormScreenState extends State<RecipientFormScreen> {
+  late TextEditingController _addressController;
+  late TextEditingController _floorUnitController;
+  late TextEditingController _contactNameController;
+  late TextEditingController _contactNumberController;
+  late TextEditingController _noteController;
+  bool _savePlace = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _addressController =
+        TextEditingController(text: widget.initialAddress ?? '');
+    _floorUnitController =
+        TextEditingController(text: widget.initialFloorUnit ?? '');
+    _contactNameController =
+        TextEditingController(text: widget.initialContactName ?? '');
+    _contactNumberController =
+        TextEditingController(text: widget.initialContactNumber ?? '');
+    _noteController = TextEditingController(text: widget.initialNote ?? '');
+  }
+
+  @override
+  void dispose() {
+    _addressController.dispose();
+    _floorUnitController.dispose();
+    _contactNameController.dispose();
+    _contactNumberController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Recipient',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildLabel('Address *'),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _addressController,
+              readOnly: true,
+              decoration: _inputDecoration(hint: 'Alamat tujuan').copyWith(
+                suffixIcon: const Icon(Icons.lock, color: Colors.grey),
+              ),
+            ),
+            const SizedBox(height: 14),
+            _buildLabel('Floor and unit no.'),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _floorUnitController,
+              decoration: _inputDecoration(hint: 'Tambah detail lantai/unit'),
+              maxLength: 120,
+            ),
+            const SizedBox(height: 4),
+            _buildLabel('Contact name *'),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _contactNameController,
+              decoration: _inputDecoration(hint: 'Nama penerima'),
+            ),
+            const SizedBox(height: 14),
+            _buildLabel('Contact number *'),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _contactNumberController,
+              decoration: _inputDecoration(hint: 'Nomor HP penerima'),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 14),
+            _buildLabel('Note to driver'),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _noteController,
+              decoration: _inputDecoration(hint: 'Tambahkan catatan'),
+              maxLength: 120,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Checkbox(
+                  value: _savePlace,
+                  onChanged: (v) {
+                    setState(() {
+                      _savePlace = v ?? false;
+                    });
+                  },
+                ),
+                Text(
+                  'Save this place',
+                  style: GoogleFonts.poppins(fontSize: 13),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _onConfirm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4CAF50),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Confirm',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Text(
+      text,
+      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
+    );
+  }
+
+  InputDecoration _inputDecoration({required String hint}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[500]),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    );
+  }
+
+  void _onConfirm() {
+    if (_addressController.text.isEmpty ||
+        _contactNameController.text.isEmpty ||
+        _contactNumberController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Address, contact name, dan nomor HP wajib diisi')),
+      );
+      return;
+    }
+
+    Navigator.pop(
+      context,
+      RecipientInfo(
+        address: _addressController.text,
+        floorUnit: _floorUnitController.text.isNotEmpty
+            ? _floorUnitController.text
+            : null,
+        contactName: _contactNameController.text,
+        contactNumber: _contactNumberController.text,
+        noteToDriver:
+            _noteController.text.isNotEmpty ? _noteController.text : null,
+        savePlace: _savePlace,
+      ),
+    );
+  }
+}
+
+class ReviewOrderScreen extends StatelessWidget {
+  final String pickupAddress;
+  final String destinationAddress;
+  final RecipientInfo recipient;
+  final String vehicle;
+  final String? itemSize;
+  final String? itemType;
+  final bool deliveryGuarantee;
+  final Future<void> Function() onBook;
+
+  const ReviewOrderScreen({
+    super.key,
+    required this.pickupAddress,
+    required this.destinationAddress,
+    required this.recipient,
+    required this.vehicle,
+    required this.onBook,
+    this.itemSize,
+    this.itemType,
+    this.deliveryGuarantee = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final vehicleLabel = {
+          'motor': 'Motor',
+          'sepeda': 'Sepeda',
+          'sepatu_roda': 'Sepatu Roda',
+          'wheels': 'Wheels',
+        }[vehicle] ??
+        vehicle;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Review Order',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _sectionTitle('Delivery details'),
+                _detailTile('Sender', pickupAddress),
+                _detailTile(
+                  'Recipient',
+                  '${recipient.contactName} • ${recipient.contactNumber}\n${recipient.address}${recipient.floorUnit != null ? '\n${recipient.floorUnit}' : ''}',
+                ),
+                const SizedBox(height: 16),
+                _sectionTitle('Options'),
+                _detailTile('Kendaraan', vehicleLabel),
+                _detailTile(
+                  'Item',
+                  '${itemSize ?? '-'} • ${itemType ?? 'Paket'}${deliveryGuarantee ? ' • Delivery Guarantee' : ''}',
+                ),
+                const SizedBox(height: 16),
+                _sectionTitle('Payment details'),
+                _detailTile('Metode', 'Bayar di tempat / COD (mock)'),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                )
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total (mock)',
+                      style: GoogleFonts.poppins(
+                          fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      'Rp 12.500',
+                      style: GoogleFonts.poppins(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: onBook,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CAF50),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Book delivery',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text,
+        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _detailTile(String title, String subtitle) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style:
+                GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[800]),
+          ),
+        ],
+      ),
+    );
   }
 }
