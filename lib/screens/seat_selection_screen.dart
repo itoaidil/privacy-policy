@@ -15,6 +15,8 @@ class SeatSelectionScreen extends StatefulWidget {
   final String? pickupAddress;
   final Map<String, double>? dropoffCoord;
   final String? dropoffAddress;
+  final int? departureProvinceId; // NEW: For tracking
+  final Map<String, double>? departureLocation; // NEW: User GPS when searching
 
   const SeatSelectionScreen({
     super.key,
@@ -26,6 +28,8 @@ class SeatSelectionScreen extends StatefulWidget {
     this.pickupAddress,
     this.dropoffCoord,
     this.dropoffAddress,
+    this.departureProvinceId, // NEW
+    this.departureLocation, // NEW
   });
 
   @override
@@ -338,6 +342,8 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                       pickupAddress: widget.pickupAddress,
                       dropoffCoord: widget.dropoffCoord,
                       dropoffAddress: widget.dropoffAddress,
+                      departureProvinceId: widget.departureProvinceId, // NEW
+                      departureLocation: widget.departureLocation, // NEW
                     ),
                   ),
                 );

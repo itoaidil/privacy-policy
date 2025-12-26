@@ -10,7 +10,7 @@ class ApiService {
 
   // Hardcoded untuk bypass Flutter web caching issue
   final String baseUrl =
-      'https://travelapifresh-aw9m3822a-fitros-projects-1b98d7a0.vercel.app/api';
+      'https://travel-api-production-23ae.up.railway.app/api';
 
   // Helper method untuk handle HTTP errors
   Map<String, dynamic> _handleError(dynamic error) {
@@ -230,6 +230,9 @@ class ApiService {
     double? dropoffLat,
     double? dropoffLng,
     String? dropoffAddress,
+    int? departureProvinceId, // NEW: Province tracking
+    double? departureLatitude, // NEW: User location when booking
+    double? departureLongitude, // NEW: User location when booking
   }) async {
     try {
       final response = await http.post(
@@ -247,6 +250,9 @@ class ApiService {
           'dropoff_lat': dropoffLat,
           'dropoff_lng': dropoffLng,
           'dropoff_address': dropoffAddress,
+          'departure_province_id': departureProvinceId, // NEW
+          'departure_latitude': departureLatitude, // NEW
+          'departure_longitude': departureLongitude, // NEW
         }),
       );
       return _parseResponse(response);
@@ -262,6 +268,9 @@ class ApiService {
     required String pickupLocation,
     required String dropoffLocation,
     required List<String> selectedSeats,
+    int? departureProvinceId, // NEW: Province tracking
+    double? departureLatitude, // NEW: User location when booking
+    double? departureLongitude, // NEW: User location when booking
   }) async {
     try {
       final response = await http.post(
@@ -273,6 +282,9 @@ class ApiService {
           'pickup_location': pickupLocation,
           'dropoff_location': dropoffLocation,
           'selected_seats': selectedSeats,
+          'departure_province_id': departureProvinceId, // NEW
+          'departure_latitude': departureLatitude, // NEW
+          'departure_longitude': departureLongitude, // NEW
         }),
       );
       return _parseResponse(response);
@@ -450,6 +462,9 @@ class ApiService {
     double? dropoffLat,
     double? dropoffLng,
     String? dropoffAddress,
+    int? departureProvinceId, // NEW: Province tracking
+    double? departureLatitude, // NEW: User location when booking
+    double? departureLongitude, // NEW: User location when booking
   }) async {
     try {
       final response = await http.post(
@@ -469,6 +484,9 @@ class ApiService {
           'dropoff_lat': dropoffLat,
           'dropoff_lng': dropoffLng,
           'dropoff_address': dropoffAddress,
+          'departure_province_id': departureProvinceId, // NEW
+          'departure_latitude': departureLatitude, // NEW
+          'departure_longitude': departureLongitude, // NEW
         }),
       );
       return _parseResponse(response);
@@ -697,6 +715,29 @@ class ApiService {
         sortOrder: 1,
       ),
     ];
+  }
+
+  // ==================== TRACKING (Customer) ====================
+
+  /// GET /api/driver-location/:travel_id
+  /// Get driver's current location for tracking (public endpoint)
+  Future<Map<String, dynamic>> getDriverLocationByTravel(int travelId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/driver-location/$travelId'),
+      );
+
+      if (response.statusCode == 200) {
+        return _parseResponse(response);
+      } else {
+        return {
+          'success': false,
+          'message': 'Driver location not available',
+        };
+      }
+    } catch (e) {
+      return _handleError(e);
+    }
   }
 
   // ==================== HEALTH CHECK ====================

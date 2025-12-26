@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import 'package:intl/intl.dart';
+import 'customer_track_driver_screen.dart';
 
 class BookingHistoryScreen extends StatefulWidget {
   const BookingHistoryScreen({super.key});
@@ -260,6 +261,48 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                 ),
               ],
             ),
+            // Add Live Tracking button for confirmed bookings
+            if ((booking['status'] == 'confirmed' ||
+                    booking['booking_status'] == 'confirmed') &&
+                booking['travel_id'] != null &&
+                booking['pickup_lat'] != null &&
+                booking['pickup_lng'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CustomerTrackDriverScreen(
+                            travelId: booking['travel_id'],
+                            bookingId: booking['id'],
+                            origin: booking['origin'] ?? 'Origin',
+                            destination:
+                                booking['destination'] ?? 'Destination',
+                            pickupLat: double.parse(
+                                booking['pickup_lat']?.toString() ?? '0'),
+                            pickupLng: double.parse(
+                                booking['pickup_lng']?.toString() ?? '0'),
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.my_location),
+                    label: const Text('Lacak Driver'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1976D2),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

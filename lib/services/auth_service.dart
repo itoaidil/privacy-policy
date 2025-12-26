@@ -55,4 +55,7 @@ class AuthService {
 
   // Get user phone
   String? get userPhone => _currentUser?['phone'];
+
+  // Get auth token
+  String? get token => _currentUser?['token'];
 }

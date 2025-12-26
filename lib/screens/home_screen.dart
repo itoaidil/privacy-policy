@@ -4,10 +4,12 @@ import 'package:provider/provider.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/travel_provider.dart';
 import '../models/po_model.dart';
 import 'po_detail_screen.dart';
 import 'map_picker_screen.dart';
+import 'location_picker_screen.dart';
 import '../services/location_service.dart';
 import '../services/province_service.dart';
 import '../models/province_model.dart';
@@ -82,14 +84,13 @@ class _HomeScreenState extends State<HomeScreen> {
   // NEW: Support province filtering jika feature enabled
   Future<List<Location>> fetchLocations(String query) async {
     try {
-      // Build URL dengan optional province filter
+      // Build URL - SEARCH ALL LOCATIONS (no province filter)
+      // User can search any location in Indonesia regardless of their GPS
       String url = '${AppConfig.baseUrl}/locations?search=$query&limit=30';
 
-      // NEW: Add province filter if feature enabled dan province selected
-      if (Features.isProvinceFilteringEnabled && _selectedProvince != null) {
-        url += '&province_id=${_selectedProvince!.id}';
-        Features.log('Filtering by province: ${_selectedProvince!.name}');
-      }
+      // DISABLED: Province filter removed to allow cross-province search
+      // User can book travel from any province (e.g., GPS in Yogya, book Padang travel)
+      // Province tracking still works - GPS saved for analytics only
 
       final response = await http.get(Uri.parse(url));
 
@@ -140,12 +141,59 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // NEW: Province detection jika feature enabled
       if (Features.isProvinceFilteringEnabled) {
-        _autoDetectProvince();
+        _loadSavedProvince(); // Load dari local storage dulu
       } else {
         // OLD: Location detection (existing behavior)
         _autoDetectUserLocation();
       }
     });
+  }
+
+  /// NEW: Load saved province dari SharedPreferences
+  Future<void> _loadSavedProvince() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedProvinceId = prefs.getInt('selected_province_id');
+      final savedProvinceName = prefs.getString('selected_province_name');
+      final savedProvinceCode = prefs.getString('selected_province_code');
+
+      if (savedProvinceId != null &&
+          savedProvinceName != null &&
+          savedProvinceCode != null) {
+        // Province sudah pernah tersimpan, langsung gunakan
+        final province = Province(
+          id: savedProvinceId,
+          name: savedProvinceName,
+          code: savedProvinceCode,
+        );
+        setState(() {
+          _selectedProvince = province;
+          _hasAutoDetectedLocation = true; // Tandai sudah ada province
+        });
+        Features.log('Loaded saved province: $savedProvinceName (from cache)');
+
+        // NO SNACKBAR saat load from cache - sudah tidak perlu notifikasi lagi
+      } else {
+        // Belum ada saved province, detect dari GPS
+        _autoDetectProvince();
+      }
+    } catch (e) {
+      Features.log('Error loading saved province: $e');
+      _autoDetectProvince(); // Fallback ke GPS detection
+    }
+  }
+
+  /// NEW: Save province ke SharedPreferences
+  Future<void> _saveProvince(Province province) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('selected_province_id', province.id);
+      await prefs.setString('selected_province_name', province.name);
+      await prefs.setString('selected_province_code', province.code);
+      Features.log('Saved province: ${province.name}');
+    } catch (e) {
+      Features.log('Error saving province: $e');
+    }
   }
 
   /// NEW: Auto-detect province dari GPS (Province Filtering Feature)
@@ -179,30 +227,11 @@ class _HomeScreenState extends State<HomeScreen> {
             _hasAutoDetectedLocation = true;
           });
 
-          Features.log('Province detected: ${province.name}');
+          // IMPORTANT: Save province ke local storage
+          await _saveProvince(province);
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.location_on, color: Colors.white),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text('Lokasi Anda: ${province.name}'),
-                    ),
-                  ],
-                ),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
-                action: SnackBarAction(
-                  label: 'Ubah',
-                  textColor: Colors.white,
-                  onPressed: () => _showProvinceSelector(),
-                ),
-              ),
-            );
-          }
+          Features.log('Province detected and saved: ${province.name}');
+          // NO SNACKBAR - Silent province detection
         } else {
           // Province not found, fallback to old location detection
           Features.log('Province not detected, using fallback');
@@ -218,50 +247,6 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _isDetectingProvince = false);
       }
     }
-  }
-
-  /// Show province selector dialog (untuk override manual)
-  Future<void> _showProvinceSelector() async {
-    final provinces = await _provinceService.getAllProvinces();
-
-    if (!mounted || provinces.isEmpty) return;
-
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Pilih Provinsi'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: provinces.map((province) {
-              return ListTile(
-                title: Text(province.name),
-                trailing: _selectedProvince?.id == province.id
-                    ? const Icon(Icons.check, color: Colors.green)
-                    : null,
-                onTap: () {
-                  setState(() => _selectedProvince = province);
-                  Navigator.pop(context);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Provinsi diubah ke: ${province.name}'),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
-              );
-            }).toList(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
-          ),
-        ],
-      ),
-    );
   }
 
   /// Auto-detect lokasi user saat pertama kali buka
@@ -448,7 +433,154 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _searchTravel() {
+  // Check if user GPS province is different from departure location province
+  Future<bool> _checkProvinceMismatch() async {
+    print('🔍 Province Mismatch Check START');
+    print(
+        '   Selected Province: ${_selectedProvince?.name} (ID: ${_selectedProvince?.id})');
+    print('   Departure Location: $_tempatBerangkat');
+
+    // If no province detected or no departure location, skip check
+    if (_selectedProvince == null || _tempatBerangkat == null) {
+      print('   ⚠️ Province or departure is null - skipping check');
+      return true; // Allow to proceed
+    }
+
+    try {
+      // Get province info for departure location
+      final url =
+          '${AppConfig.baseUrl}/locations?search=$_tempatBerangkat&limit=1';
+      print('   🌐 API Request: $url');
+
+      final response = await http.get(Uri.parse(url));
+      print('   📡 API Response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('   📦 API Data: $data');
+
+        if (data['data'] != null && (data['data'] as List).isNotEmpty) {
+          final locationData = data['data'][0];
+          final departureProvinceId = locationData['province_id'];
+
+          print('   🏛️ Departure Province ID: $departureProvinceId');
+          print('   📍 User GPS Province ID: ${_selectedProvince!.id}');
+
+          // If province IDs are different, show warning dialog
+          if (departureProvinceId != null &&
+              departureProvinceId != _selectedProvince!.id) {
+            print('   ⚠️ MISMATCH DETECTED! Showing dialog...');
+            return await _showProvinceWarningDialog();
+          } else {
+            print(
+                '   ✅ Same province or departure has no province - no warning needed');
+          }
+        }
+      }
+    } catch (e) {
+      print('   ❌ Error checking province mismatch: $e');
+    }
+
+    print('   ✅ Province check complete - allowing to proceed');
+    return true; // Default: allow to proceed
+  }
+
+  // Show warning dialog when user GPS province differs from departure location
+  Future<bool> _showProvinceWarningDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.orange,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Lokasi Jauh',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: Text(
+                'Anda berada jauh dari lokasi pemesanan. Anda Memilih tempat berangkat $_tempatBerangkatDisplay. Apakah pemesanan tetap dilanjutkan?',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  height: 1.5,
+                ),
+              ),
+              contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+              actions: [
+                // Kembali button (white/grey)
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.grey[200],
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Kembali',
+                    style: GoogleFonts.poppins(
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Lanjut button (blue)
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D47A1),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                  ),
+                  child: Text(
+                    'Lanjut',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ],
+              actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+            );
+          },
+        ) ??
+        false; // Default to false if dialog is dismissed
+  }
+
+  void _searchTravel() async {
     if (_formKey.currentState!.validate()) {
       if (_tempatBerangkat == _tujuan) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -458,6 +590,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
         return;
+      }
+
+      // Check for province mismatch and show warning if needed
+      final shouldProceed = await _checkProvinceMismatch();
+
+      if (!shouldProceed) {
+        return; // User chose "Kembali"
       }
 
       // Search PO berdasarkan rute
@@ -518,49 +657,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.all(24),
                           child: Column(
                             children: [
-                              // NEW: Province indicator (jika feature enabled)
-                              if (Features.isProvinceFilteringEnabled &&
-                                  _selectedProvince != null)
-                                Container(
-                                  margin: const EdgeInsets.only(bottom: 16),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue[50],
-                                    borderRadius: BorderRadius.circular(8),
-                                    border:
-                                        Border.all(color: Colors.blue[200]!),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.location_city,
-                                          color: Colors.blue[700], size: 20),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'Menampilkan travel di ${_selectedProvince!.name}',
-                                          style: TextStyle(
-                                            color: Colors.blue[700],
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                      InkWell(
-                                        onTap: _showProvinceSelector,
-                                        child: Text(
-                                          'Ubah',
-                                          style: TextStyle(
-                                            color: Colors.blue[700],
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                            decoration:
-                                                TextDecoration.underline,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              // Province detection removed - silent filtering
 
                               // Loading province indicator
                               if (_isDetectingProvince)
@@ -626,12 +723,42 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ),
                                 ),
-                              TypeAheadField<Location>(
-                                controller: _departureController,
-                                builder: (context, controller, focusNode) {
-                                  return TextFormField(
-                                    controller: controller,
-                                    focusNode: focusNode,
+                              InkWell(
+                                onTap: () async {
+                                  final location =
+                                      await Navigator.push<Location>(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          LocationPickerScreen(
+                                        title: 'Pilih Tempat Berangkat',
+                                        provinceId:
+                                            Features.isProvinceFilteringEnabled &&
+                                                    _selectedProvince != null
+                                                ? _selectedProvince!.id
+                                                : null,
+                                      ),
+                                    ),
+                                  );
+
+                                  if (location != null) {
+                                    setState(() {
+                                      _tempatBerangkat = location.name;
+                                      _tempatBerangkatDisplay =
+                                          location.displayName;
+                                      _departureController.text =
+                                          location.displayName;
+                                      _tujuan = null;
+                                      _tujuanDisplay = null;
+                                      _destinationController.clear();
+                                    });
+                                    provider
+                                        .loadDestinationCities(location.name);
+                                  }
+                                },
+                                child: AbsorbPointer(
+                                  child: TextFormField(
+                                    controller: _departureController,
                                     style: GoogleFonts.poppins(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w500,
@@ -690,10 +817,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 provider.loadDestinationCities(
                                                     _tempatBerangkat!);
 
-                                                // Close any open keyboards/suggestion overlays
-                                                FocusScope.of(context)
-                                                    .unfocus();
-
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
                                                   const SnackBar(
@@ -742,7 +865,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       filled: true,
                                       fillColor: Colors.white,
                                       hintText:
-                                          'Ketik atau pilih tempat berangkat',
+                                          'Ketuk untuk pilih tempat berangkat',
                                       hintStyle: GoogleFonts.poppins(
                                         color: Colors.grey[400],
                                       ),
@@ -753,102 +876,43 @@ class _HomeScreenState extends State<HomeScreen> {
                                       }
                                       return null;
                                     },
-                                  );
-                                },
-                                suggestionsCallback: (pattern) async {
-                                  if (pattern.isEmpty) {
-                                    // Show popular locations when empty
-                                    return await fetchPopularLocations();
-                                  }
-                                  // Search locations by pattern
-                                  return await fetchLocations(pattern);
-                                },
-                                emptyBuilder: (context) => Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Text(
-                                    'Tidak ada lokasi ditemukan',
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.grey[600],
-                                    ),
                                   ),
                                 ),
-                                itemBuilder: (context, location) {
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      border: Border(
-                                        bottom: BorderSide(
-                                          color: Colors.grey[200]!,
-                                          width: 0.5,
-                                        ),
-                                      ),
-                                    ),
-                                    child: ListTile(
-                                      leading: CircleAvatar(
-                                        radius: 20,
-                                        backgroundColor: location.isPopular
-                                            ? const Color(0xFFFF6F00)
-                                                .withOpacity(0.1)
-                                            : const Color(0xFF0D47A1)
-                                                .withOpacity(0.1),
-                                        child: Icon(
-                                          location.type == 'city'
-                                              ? Icons.location_city
-                                              : Icons.location_on,
-                                          color: location.isPopular
-                                              ? const Color(0xFFFF6F00)
-                                              : const Color(0xFF0D47A1),
-                                          size: 20,
-                                        ),
-                                      ),
-                                      title: Text(
-                                        location.displayName,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 15,
-                                          fontWeight: location.isPopular
-                                              ? FontWeight.w600
-                                              : FontWeight.w500,
-                                        ),
-                                      ),
-                                      subtitle: location.parentName != null
-                                          ? Text(
-                                              location.parentName!,
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
-                                              ),
-                                            )
-                                          : null,
-                                      trailing: Icon(
-                                        Icons.arrow_forward_ios,
-                                        size: 14,
-                                        color: Colors.grey[400],
-                                      ),
-                                    ),
-                                  );
-                                },
-                                onSelected: (location) {
-                                  setState(() {
-                                    _tempatBerangkat =
-                                        location.name; // Nama asli untuk API
-                                    _tempatBerangkatDisplay =
-                                        location.displayName; // Display name
-                                    _departureController.text =
-                                        location.displayName;
-                                    _tujuan = null;
-                                    _tujuanDisplay = null;
-                                    _destinationController.clear();
-                                  });
-                                  // Load destinations menggunakan API provider existing
-                                  provider.loadDestinationCities(location.name);
-                                },
                               ),
                               const SizedBox(height: 20),
-                              TypeAheadField<Location>(
-                                controller: _destinationController,
-                                builder: (context, controller, focusNode) {
-                                  return TextFormField(
-                                    controller: controller,
-                                    focusNode: focusNode,
+                              InkWell(
+                                onTap: _tempatBerangkat == null
+                                    ? null
+                                    : () async {
+                                        final location =
+                                            await Navigator.push<Location>(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                LocationPickerScreen(
+                                              title: 'Pilih Tujuan',
+                                              provinceId: Features
+                                                          .isProvinceFilteringEnabled &&
+                                                      _selectedProvince != null
+                                                  ? _selectedProvince!.id
+                                                  : null,
+                                            ),
+                                          ),
+                                        );
+
+                                        if (location != null) {
+                                          setState(() {
+                                            _tujuan = location.name;
+                                            _tujuanDisplay =
+                                                location.displayName;
+                                            _destinationController.text =
+                                                location.displayName;
+                                          });
+                                        }
+                                      },
+                                child: AbsorbPointer(
+                                  child: TextFormField(
+                                    controller: _destinationController,
                                     enabled: _tempatBerangkat != null,
                                     style: GoogleFonts.poppins(
                                       fontSize: 15,
@@ -910,7 +974,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           : Colors.white,
                                       hintText: _tempatBerangkat == null
                                           ? 'Pilih tempat berangkat dulu'
-                                          : 'Ketik atau pilih tujuan',
+                                          : 'Ketuk untuk pilih tujuan',
                                       hintStyle: GoogleFonts.poppins(
                                         color: Colors.grey[400],
                                       ),
@@ -921,92 +985,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                       }
                                       return null;
                                     },
-                                  );
-                                },
-                                suggestionsCallback: (pattern) async {
-                                  if (_tempatBerangkat == null) {
-                                    return [];
-                                  }
-                                  if (pattern.isEmpty) {
-                                    // Show popular locations when empty
-                                    return await fetchPopularLocations();
-                                  }
-                                  // Search locations by pattern
-                                  return await fetchLocations(pattern);
-                                },
-                                emptyBuilder: (context) => Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Text(
-                                    'Tidak ada lokasi ditemukan',
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.grey[600],
-                                    ),
                                   ),
                                 ),
-                                itemBuilder: (context, location) {
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      border: Border(
-                                        bottom: BorderSide(
-                                          color: Colors.grey[200]!,
-                                          width: 0.5,
-                                        ),
-                                      ),
-                                    ),
-                                    child: ListTile(
-                                      leading: CircleAvatar(
-                                        radius: 20,
-                                        backgroundColor: location.isPopular
-                                            ? const Color(0xFFFF6F00)
-                                                .withOpacity(0.1)
-                                            : const Color(0xFF0D47A1)
-                                                .withOpacity(0.1),
-                                        child: Icon(
-                                          location.type == 'city'
-                                              ? Icons.location_city
-                                              : Icons.flag,
-                                          color: location.isPopular
-                                              ? const Color(0xFFFF6F00)
-                                              : const Color(0xFF0D47A1),
-                                          size: 20,
-                                        ),
-                                      ),
-                                      title: Text(
-                                        location.displayName,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 15,
-                                          fontWeight: location.isPopular
-                                              ? FontWeight.w600
-                                              : FontWeight.w500,
-                                        ),
-                                      ),
-                                      subtitle: location.parentName != null
-                                          ? Text(
-                                              location.parentName!,
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
-                                              ),
-                                            )
-                                          : null,
-                                      trailing: Icon(
-                                        Icons.arrow_forward_ios,
-                                        size: 14,
-                                        color: Colors.grey[400],
-                                      ),
-                                    ),
-                                  );
-                                },
-                                onSelected: (location) {
-                                  setState(() {
-                                    _tujuan =
-                                        location.name; // Nama asli untuk API
-                                    _tujuanDisplay =
-                                        location.displayName; // Display name
-                                    _destinationController.text =
-                                        location.displayName;
-                                  });
-                                },
                               ),
                               const SizedBox(height: 20),
                               // Optional pickup point (based on departure city)
@@ -1333,6 +1313,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   pickupAddress: _pickupAddress,
                   dropoffCoord: _dropoffCoord,
                   dropoffAddress: _dropoffAddress,
+                  departureProvinceId:
+                      _selectedProvince?.id, // NEW: Track province
+                  departureLocation: _pickupCoord, // NEW: Track user location
                 ),
               ),
             );
@@ -1503,6 +1486,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             pickupAddress: _pickupAddress,
                             dropoffCoord: _dropoffCoord,
                             dropoffAddress: _dropoffAddress,
+                            departureProvinceId:
+                                _selectedProvince?.id, // NEW: Track province
+                            departureLocation:
+                                _pickupCoord, // NEW: Track user location
                           ),
                         ),
                       );

@@ -9,8 +9,7 @@ class AppConfig {
   /// Production: override via --dart-define=API_BASE_URL=...
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue:
-        'https://travelapifresh-aw9m3822a-fitros-projects-1b98d7a0.vercel.app',
+    defaultValue: 'https://travel-api-production-23ae.up.railway.app',
   );
 
   /// Full API endpoint base (Vercel routes all to /api via rewrites).

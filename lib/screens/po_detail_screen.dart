@@ -15,6 +15,8 @@ class PODetailScreen extends StatefulWidget {
   final String? pickupAddress;
   final Map<String, double>? dropoffCoord;
   final String? dropoffAddress;
+  final int? departureProvinceId; // NEW: For tracking
+  final Map<String, double>? departureLocation; // NEW: User GPS when searching
 
   const PODetailScreen({
     Key? key,
@@ -26,6 +28,8 @@ class PODetailScreen extends StatefulWidget {
     this.pickupAddress,
     this.dropoffCoord,
     this.dropoffAddress,
+    this.departureProvinceId, // NEW
+    this.departureLocation, // NEW
   }) : super(key: key);
 
   @override
@@ -632,6 +636,9 @@ class _PODetailScreenState extends State<PODetailScreen> {
                             pickupAddress: widget.pickupAddress,
                             dropoffCoord: widget.dropoffCoord,
                             dropoffAddress: widget.dropoffAddress,
+                            departureProvinceId:
+                                widget.departureProvinceId, // NEW
+                            departureLocation: widget.departureLocation, // NEW
                           ),
                         ),
                       );

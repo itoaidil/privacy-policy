@@ -18,6 +18,8 @@ class PaymentScreen extends StatefulWidget {
   final String? pickupAddress;
   final Map<String, double>? dropoffCoord;
   final String? dropoffAddress;
+  final int? departureProvinceId; // NEW: For tracking where order came from
+  final Map<String, double>? departureLocation; // NEW: User GPS when searching
 
   const PaymentScreen({
     super.key,
@@ -32,6 +34,8 @@ class PaymentScreen extends StatefulWidget {
     this.pickupAddress,
     this.dropoffCoord,
     this.dropoffAddress,
+    this.departureProvinceId, // NEW
+    this.departureLocation, // NEW
   });
 
   @override
@@ -136,6 +140,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
         dropoffLat: widget.dropoffCoord?['lat'],
         dropoffLng: widget.dropoffCoord?['lng'],
         dropoffAddress: widget.dropoffAddress,
+        departureProvinceId: widget.departureProvinceId, // NEW: Track province
+        departureLatitude:
+            widget.departureLocation?['lat'], // NEW: Track user location
+        departureLongitude:
+            widget.departureLocation?['lng'], // NEW: Track user location
       );
 
       final bookingId = result['data']['booking_id'];

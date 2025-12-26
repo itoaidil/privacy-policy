@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import 'home_screen.dart';
 import 'booking_history_screen.dart';
 import 'profile_screen.dart';
+import 'notifications_screen.dart';
+import 'instant_ride_screen.dart';
+import 'dart:async';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -14,6 +18,9 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
+  int _unreadNotificationCount = 0;
+  final AuthService _authService = AuthService();
+  StreamSubscription? _notificationSubscription;
 
   late final List<Widget> _screens;
 
@@ -25,6 +32,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const BookingHistoryScreen(),
       const ProfileScreen(),
     ];
+    _loadUnreadCount();
+
+    // Listen to real-time notifications
+    _notificationSubscription =
+        NotificationService.onNotificationReceived.listen((message) {
+      print('🔔 Real-time notification received in dashboard');
+      // Automatically reload unread count when new notification arrives
+      _loadUnreadCount();
+    });
+  }
+
+  @override
+  void dispose() {
+    _notificationSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    final userId = _authService.userId;
+    if (userId != null) {
+      try {
+        final count = await NotificationService.getUnreadCount(userId: userId);
+        if (mounted) {
+          setState(() {
+            _unreadNotificationCount = count;
+          });
+        }
+      } catch (e) {
+        print('Error loading unread count: $e');
+      }
+    }
   }
 
   void _onItemTapped(int index) {
@@ -41,13 +79,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
         backgroundColor: const Color(0xFF0D47A1),
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Belum ada notifikasi')),
-              );
-            },
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  );
+                  // Reload unread count after returning from notifications
+                  _loadUnreadCount();
+                },
+              ),
+              if (_unreadNotificationCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      _unreadNotificationCount > 99
+                          ? '99+'
+                          : _unreadNotificationCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -133,7 +207,7 @@ class DashboardContent extends StatelessWidget {
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  // Menu Grid (10 menu dalam grid 4 per row)
+                  // Menu Grid (dengan Antar Paket di Row 3)
                   Column(
                     children: [
                       // Row 1: 4 menu pertama
@@ -143,8 +217,8 @@ class DashboardContent extends StatelessWidget {
                           // Hantar Pulang
                           _buildSquareMenuCard(
                             context: context,
-                            icon: Icons.home,
-                            iconColor: const Color(0xFF0D47A1),
+                            icon: Icons.cottage,
+                            iconColor: const Color.fromARGB(255, 48, 74, 112),
                             title: 'Hantar\nPulang',
                             onTap: () {
                               Navigator.push(
@@ -281,6 +355,62 @@ class DashboardContent extends StatelessWidget {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      // Row 3: Antar Paket di bawah Hantar Umroh
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildSquareMenuCard(
+                            context: context,
+                            icon: Icons.local_shipping,
+                            iconColor: const Color(0xFF4CAF50),
+                            title: 'Antar\nPaket',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const InstantRideScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 10),
+                          // Placeholder for future menu
+                          Opacity(
+                            opacity: 0,
+                            child: _buildSquareMenuCard(
+                              context: context,
+                              icon: Icons.abc,
+                              iconColor: Colors.grey,
+                              title: '',
+                              onTap: () {},
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Opacity(
+                            opacity: 0,
+                            child: _buildSquareMenuCard(
+                              context: context,
+                              icon: Icons.abc,
+                              iconColor: Colors.grey,
+                              title: '',
+                              onTap: () {},
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Opacity(
+                            opacity: 0,
+                            child: _buildSquareMenuCard(
+                              context: context,
+                              icon: Icons.abc,
+                              iconColor: Colors.grey,
+                              title: '',
+                              onTap: () {},
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
 
@@ -351,9 +481,73 @@ class DashboardContent extends StatelessWidget {
     );
   }
 
+  Widget _buildFeaturedCard({
+    required IconData icon,
+    required Color iconColor,
+    required Color backgroundColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 110,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              backgroundColor,
+              backgroundColor.withOpacity(0.8),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: backgroundColor.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: iconColor, size: 30),
+              const SizedBox(height: 6),
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: GoogleFonts.poppins(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 11,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSquareMenuCard({
     required BuildContext context,
-    required IconData icon,
+    IconData? icon,
+    String? iconAsset,
     required Color iconColor,
     required String title,
     required VoidCallback onTap,
@@ -365,20 +559,23 @@ class DashboardContent extends StatelessWidget {
         width: 78,
         height: 78,
         decoration: BoxDecoration(
-          color: const Color(0xFF0D47A1).withOpacity(0.08),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF0D47A1).withOpacity(0.15),
+              const Color(0xFF1976D2).withOpacity(0.05),
+            ],
+          ),
           borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 30, color: iconColor),
+            if (iconAsset != null)
+              Image.asset(iconAsset, width: 45, height: 45)
+            else if (icon != null)
+              Icon(icon, size: 45, color: iconColor),
             const SizedBox(height: 6),
             Text(
               title,

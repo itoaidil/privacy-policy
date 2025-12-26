@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import '../config/app_config.dart';
 import 'map_picker_screen.dart';
 
@@ -29,6 +31,9 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
   String?
       _itemType; // document, food, clothing, electronics, glass, fragile, custom
   String? _itemPhotoUrl;
+  File? _itemPhotoFile;
+  bool _isUploadingPhoto = false;
+  final ImagePicker _imagePicker = ImagePicker();
 
   // Recipient details (filled after first confirm)
   RecipientInfo? _recipientInfo;
@@ -252,6 +257,107 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
                           selectedColor: const Color(0xFF4CAF50),
                         );
                       }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Item Photo Upload
+                    Text(
+                      'Foto Barang (Opsional)',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: _isUploadingPhoto ? null : _pickAndUploadItemPhoto,
+                      child: Container(
+                        height: 120,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                              color: Colors.grey[300]!,
+                              width: 2,
+                              style: BorderStyle.solid),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.grey[50],
+                        ),
+                        child: _isUploadingPhoto
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFF4CAF50)),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Mengupload foto...',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : _itemPhotoFile != null
+                                ? Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.file(
+                                          _itemPhotoFile!,
+                                          width: double.infinity,
+                                          height: 120,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              _itemPhotoFile = null;
+                                              _itemPhotoUrl = null;
+                                            });
+                                          },
+                                          child: Container(
+                                            padding: EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.camera_alt,
+                                            size: 40, color: Colors.grey[400]),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Tap untuk ambil foto barang',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 13,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                      ),
                     ),
                     const SizedBox(height: 20),
 
@@ -553,6 +659,98 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
   }
 
   double _deg2rad(double deg) => deg * (math.pi / 180.0);
+
+  /// Pick image from camera or gallery and upload to Cloudinary
+  Future<void> _pickAndUploadItemPhoto() async {
+    try {
+      // Show dialog to choose camera or gallery
+      final ImageSource? source = await showDialog<ImageSource>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            'Pilih Sumber Foto',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.camera_alt, color: Color(0xFF4CAF50)),
+                title: Text('Kamera', style: GoogleFonts.poppins()),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library, color: Color(0xFF4CAF50)),
+                title: Text('Galeri', style: GoogleFonts.poppins()),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (source == null) return;
+
+      // Pick image
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (pickedFile == null) return;
+
+      setState(() {
+        _itemPhotoFile = File(pickedFile.path);
+        _isUploadingPhoto = true;
+      });
+
+      // Upload to Cloudinary via API
+      final uploadUrl = Uri.parse('${AppConfig.baseUrl}/upload/item-photo');
+      var request = http.MultipartRequest('POST', uploadUrl);
+      request.files.add(
+        await http.MultipartFile.fromPath('item_photo', pickedFile.path),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      setState(() {
+        _isUploadingPhoto = false;
+      });
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        if (result['success'] == true) {
+          setState(() {
+            _itemPhotoUrl = result['photo_url'];
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Foto berhasil diupload'),
+              backgroundColor: Color(0xFF4CAF50),
+            ),
+          );
+        } else {
+          throw Exception(result['message'] ?? 'Upload failed');
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        _isUploadingPhoto = false;
+        _itemPhotoFile = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal upload foto: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   Future<void> _openRecipientForm() async {
     final info = await Navigator.push<RecipientInfo?>(

@@ -4,6 +4,7 @@ import 'register_screen.dart';
 import '../dashboard_screen.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -62,6 +63,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
         // Simpan data user ke AuthService
         await _authService.setUser(data);
+
+        // Register FCM token untuk push notifications
+        try {
+          final userId = data['id'];
+          if (userId != null) {
+            await NotificationService.registerToken(
+              userId: userId,
+              appType: 'customer',
+            );
+          }
+        } catch (e) {
+          print('⚠️  Failed to register notification token: $e');
+          // Don't block login if notification registration fails
+        }
 
         // Navigate to dashboard screen after successful login
         Navigator.pushReplacement(

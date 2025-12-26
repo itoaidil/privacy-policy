@@ -24,6 +24,13 @@ dependencies:
   shared_preferences: ^2.2.2
   geolocator: ^10.1.0
   geocoding: ^2.1.1
+  google_maps_flutter: ^2.5.0
+  permission_handler: ^11.0.1
+  image_picker: ^1.0.4
+  # Firebase for push notifications
+  firebase_core: ^2.24.2
+  firebase_messaging: ^14.7.9
+  flutter_local_notifications: ^17.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -35,6 +42,8 @@ flutter:
   assets:
     - assets/logo.png
     - assets/app_icon.png
+    - assets/icons/icon_untuk_hantar_pulang.png
+    - assets/icons/icon_home_tp_bg.png
 
 flutter_launcher_icons:
   android: true

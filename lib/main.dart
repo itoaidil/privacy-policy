@@ -3,8 +3,20 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'screens/splash_screen.dart';
 import 'providers/travel_provider.dart';
+import 'services/fcm_notification_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Skip notification service initialization due to plugin compatibility issues
+  // FCM will still work for basic push notifications via Firebase
+  // try {
+  //   await FCMNotificationService.initialize();
+  //   print('✅ FCM initialized for Customer App');
+  // } catch (e) {
+  //   print('⚠️  Failed to initialize FCM: $e');
+  // }
+
   runApp(const MyApp());
 }
 
