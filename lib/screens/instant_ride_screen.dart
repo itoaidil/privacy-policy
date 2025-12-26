@@ -36,6 +36,11 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
 
   static const int _testDriverUserId = 12; // TEMP: for end-to-end test
 
+  // Pricing constants
+  static const double _baseFare = 5000;
+  static const double _perKmRate = 2000;
+  static const double _guaranteeFee = 3000;
+
   static const List<String> _itemTypes = [
     'document',
     'food',
@@ -642,6 +647,29 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
         ),
       ),
     );
+  }
+
+  /// Calculate total fare based on distance and vehicle type
+  double _calculateTotalFare(String vehicleType) {
+    final distance = _distanceKm ?? 0;
+    double baseFare = _baseFare;
+
+    // Vehicle type multiplier
+    double multiplier = 1.0;
+    if (vehicleType == 'car') {
+      multiplier = 1.5;
+    } else if (vehicleType == 'truck') {
+      multiplier = 2.0;
+    }
+
+    double totalFare = baseFare + (distance * _perKmRate * multiplier);
+
+    // Add guarantee fee if selected
+    if (_deliveryGuarantee) {
+      totalFare += _guaranteeFee;
+    }
+
+    return totalFare;
   }
 
   Future<void> _simulateBookDelivery() async {
