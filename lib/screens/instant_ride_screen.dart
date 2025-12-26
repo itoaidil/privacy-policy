@@ -29,7 +29,6 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
   String?
       _itemType; // document, food, clothing, electronics, glass, fragile, custom
   String? _itemPhotoUrl;
-  bool _deliveryGuarantee = false;
 
   // Recipient details (filled after first confirm)
   RecipientInfo? _recipientInfo;
@@ -39,7 +38,6 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
   // Pricing constants
   static const double _baseFare = 5000;
   static const double _perKmRate = 2000;
-  static const double _guaranteeFee = 3000;
 
   static const List<String> _itemTypes = [
     'document',
@@ -254,56 +252,6 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
                           selectedColor: const Color(0xFF4CAF50),
                         );
                       }).toList(),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Delivery Guarantee
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.verified_user,
-                            color: const Color(0xFF4CAF50),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Delivery Guarantee',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                Text(
-                                  'Asuransi pengiriman hingga Rp 5 juta',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Switch(
-                            value: _deliveryGuarantee,
-                            onChanged: (value) {
-                              setState(() {
-                                _deliveryGuarantee = value;
-                              });
-                            },
-                            activeColor: const Color(0xFF4CAF50),
-                          ),
-                        ],
-                      ),
                     ),
                     const SizedBox(height: 20),
 
@@ -642,7 +590,6 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
           vehicle: _selectedVehicle,
           itemSize: _itemSize,
           itemType: _itemType,
-          deliveryGuarantee: _deliveryGuarantee,
           onBook: _simulateBookDelivery,
         ),
       ),
@@ -663,12 +610,6 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
     }
 
     double totalFare = baseFare + (distance * _perKmRate * multiplier);
-
-    // Add guarantee fee if selected
-    if (_deliveryGuarantee) {
-      totalFare += _guaranteeFee;
-    }
-
     return totalFare;
   }
 
@@ -734,8 +675,6 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
         'item_size': _itemSize,
         'item_type': _itemType,
         'item_photo_url': _itemPhotoUrl,
-        'delivery_guarantee': _deliveryGuarantee,
-        'guarantee_fee': _deliveryGuarantee ? _guaranteeFee : 0,
         // Recipient details
         'recipient_name': _recipientInfo!.contactName,
         'recipient_phone': _recipientInfo!.contactNumber,
@@ -1010,7 +949,6 @@ class ReviewOrderScreen extends StatelessWidget {
   final String vehicle;
   final String? itemSize;
   final String? itemType;
-  final bool deliveryGuarantee;
   final Future<void> Function() onBook;
 
   const ReviewOrderScreen({
@@ -1022,7 +960,6 @@ class ReviewOrderScreen extends StatelessWidget {
     required this.onBook,
     this.itemSize,
     this.itemType,
-    this.deliveryGuarantee = false,
   });
 
   @override
@@ -1062,7 +999,7 @@ class ReviewOrderScreen extends StatelessWidget {
                 _detailTile('Kendaraan', vehicleLabel),
                 _detailTile(
                   'Item',
-                  '${itemSize ?? '-'} • ${itemType ?? 'Paket'}${deliveryGuarantee ? ' • Delivery Guarantee' : ''}',
+                  '${itemSize ?? '-'} • ${itemType ?? 'Paket'}',
                 ),
                 const SizedBox(height: 16),
                 _sectionTitle('Payment details'),
