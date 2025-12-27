@@ -613,25 +613,41 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
       _distanceKm = null;
     }
 
+    print('📊 VEHICLE CALCULATION DEBUG:');
+    print('  - Weight: $_packageWeightKg kg');
+    print('  - Distance: $_distanceKm km');
+    print('  - Pickup: $_pickupCoord');
+    print('  - Destination: $_destinationCoord');
+
     final newAllowed = <String>[];
 
-    // Aturan jarak
+    // Aturan: Jarak > 2 KM hanya motor
     if (_distanceKm != null && _distanceKm! > 2.0) {
-      // > 2 KM → hanya motor
+      print('  ✓ Distance > 2km → Motor only');
       newAllowed.add('motor');
     } else {
-      // <= 2 KM → motor selalu tersedia
+      print('  ✓ Distance ≤ 2km → Motor + Light options');
+      // Motor selalu tersedia
       newAllowed.add('motor');
-      // Aturan berat: < 1 KG → tambahkan sepeda, sepatu roda, wheels
+
+      // Berat < 1 KG: tambah sepeda, sepatu roda, wheels
       if (_packageWeightKg != null && _packageWeightKg! < 1.0) {
+        print('  ✓ Weight < 1kg → Adding sepeda, sepatu_roda, wheels');
         newAllowed.addAll(['sepeda', 'sepatu_roda', 'wheels']);
+      } else if (_packageWeightKg != null) {
+        print('  ✗ Weight ≥ 1kg → Only motor');
+      } else {
+        print('  ? Weight not set yet');
       }
     }
+
+    print('  → Allowed vehicles: $newAllowed');
 
     setState(() {
       _allowedVehicles = newAllowed;
       if (!_allowedVehicles.contains(_selectedVehicle)) {
         _selectedVehicle = _allowedVehicles.first;
+        print('  → Vehicle switched to: $_selectedVehicle');
       }
     });
   }
