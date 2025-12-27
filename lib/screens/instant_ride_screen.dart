@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/http.dart' show MediaType;
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:io';
@@ -722,12 +723,24 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
         _isUploadingPhoto = true;
       });
 
+      print('📤 UPLOADING PHOTO:');
+      print('  Path: ${pickedFile.path}');
+      print('  Name: ${pickedFile.name}');
+      print('  MIME: ${pickedFile.mimeType}');
+
       // Upload to Cloudinary via API
       final uploadUrl = Uri.parse('${AppConfig.baseUrl}/upload/item-photo');
       var request = http.MultipartRequest('POST', uploadUrl);
-      request.files.add(
-        await http.MultipartFile.fromPath('item_photo', pickedFile.path),
+
+      // Create multipart file with explicit MIME type
+      final multipartFile = await http.MultipartFile.fromPath(
+        'item_photo',
+        pickedFile.path,
+        contentType: _getMimeType(pickedFile.mimeType),
       );
+
+      print('  Multipart MIME: ${multipartFile.contentType}');
+      request.files.add(multipartFile);
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
@@ -766,6 +779,23 @@ class _InstantRideScreenState extends State<InstantRideScreen> {
         ),
       );
     }
+  }
+
+  /// Helper to get correct MIME type from image picker
+  MediaType _getMimeType(String? mimeType) {
+    if (mimeType == null) return MediaType('image', 'jpeg');
+
+    if (mimeType.contains('jpeg') || mimeType.contains('jpg')) {
+      return MediaType('image', 'jpeg');
+    } else if (mimeType.contains('png')) {
+      return MediaType('image', 'png');
+    } else if (mimeType.contains('gif')) {
+      return MediaType('image', 'gif');
+    } else if (mimeType.contains('webp')) {
+      return MediaType('image', 'webp');
+    }
+
+    return MediaType('image', 'jpeg'); // default to jpeg
   }
 
   Future<void> _openRecipientForm() async {
